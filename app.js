@@ -1,7 +1,7 @@
 const express = require("express");
 
 
-const noticeRoute = require("./routes/notice-route");
+const elvRouter = require("./routes/elvRouter");
 
 
 const app = express();
@@ -10,7 +10,7 @@ const port = 3000; // 서버 포트번호
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/notice", noticeRoute);
+app.use("/elv", elvRouter);
 
 
 app.listen(port, () => {
