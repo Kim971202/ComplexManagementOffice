@@ -1,0 +1,109 @@
+const express = require("express");
+const router = express.Router();
+const pool = require("../DB/dbPool");
+
+//공지사항 목록조회
+router.get("/getNoticeList", async (req, res, next) => {
+  let {
+    serviceKey = "111111111", // 서비스 인증키
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1, //               페이지 번호
+    doubleDataFlag = "Y", //     2배수 데이터 사용여부
+    dongCode = "0000", //        동코드
+    hoCode = "0000", //          호코드
+    notiType = "ALL", //           공지타입 : 전체데이터(ALL), 전체공지(1), 세대 개별공지(2)
+  } = req.query;
+
+  console.log(
+    serviceKey,
+    numOfRows,
+    pageNo,
+    dongCode,
+    hoCode,
+    doubleDataFlag,
+    notiType
+  );
+  //http://localhost:3000/notice/getNoticeList?serviceKey=22222&numOfRows=5&pageNo=2&dongCode=101&hoCode=101&doubleDataFlag=Y&notiType=ALL
+
+  let resultCode = "00";
+
+  if (serviceKey === "") resultCode = "10";
+  if (numOfRows === "") resultCode = "10";
+  if (pageNo === "") resultCode = "10";
+  if (dongCode === "") resultCode = "10";
+  if (hoCode === "") resultCode = "10";
+  if (notiType === "") resultCode = "10";
+
+  console.log("resulCode=> " + resultCode);
+  if (resultCode !== "00") {
+    return res.json({ resultCode: "01", resultMsg: "에러" });
+  }
+
+  try {
+    let sRow = (pageNo - 1) * numOfRows;
+    //console.log("sRow = %d", sRow);
+    //ex: 2page start = (2-1) * 10
+
+    let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
+    //console.log("size= %d", size);
+
+    let notiType_ = "%";
+    if (notiType === "1") notiType_ = "전체";
+    else if (notiType === "2") notiType_ = "개별";
+    console.log("notiType_=> " + notiType_);
+
+    const sql3 = `UPDATE t_notice a 
+                    INNER JOIN t_notice_send b 
+                    ON a.idx = b.idx
+                    SET a.new_flag = IF (DATE_ADD(a.start_date, INTERVAL 3 DAY)  >=now(), 'Y', 'N')
+                    WHERE a.idx = b.idx;`;
+    const data3 = await pool.query(sql3);
+    console.log("data3: " + data3);
+
+    const tSQL =
+      " and b.dong_code ='" + dongCode + "' and b.ho_code = '" + hoCode + "' ";
+    
+
+    const sql = `select a.idx, a.noti_type as notiType, a.noti_title as notiTitle, DATE_FORMAT(a.start_date, '%Y%m%d') as startDate, a.new_flag as newFlag
+                   from t_notice a
+                   inner join  t_notice_send b 
+                   where  a.idx = b.idx and a.start_date <= now() and end_date >= now() and a.noti_type LIKE ?  ${tSQL}
+                   limit ?, ?`;
+    console.log("sql=>" + sql);
+    console.log("notiType_=> " + notiType_);
+    const data = await pool.query(sql, [notiType_, Number(sRow), Number(size)]);
+    let resultList = data[0];
+
+    const sql2 = `select count(a.idx) as cnt
+                   from t_notice a
+                   inner join  t_notice_send b 
+                   where a.idx = b.idx and a.start_date <= now() and end_date >= now() and a.noti_type LIKE ?  ${tSQL};`;
+    //const sql2 = "select count(*) as cnt from t_notice where noti_type = ?";
+    console.log("notiType_=> " + notiType_);
+    const data2 = await pool.query(sql2, [notiType_]);
+    let resultCnt = data2[0];
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
+      doubleDataFlag,
+      data: {
+        //dataType,
+        dongCode,
+        hoCode,
+        notiType,
+        items: resultList,
+      },
+    };
+    // console.log(resultList);
+
+    return res.json(jsonResult);
+  } catch (err) {
+    return res.status(500).json(err);
+  }
+});
+
+module.exports = router;
