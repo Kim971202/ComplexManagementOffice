@@ -60,11 +60,17 @@ router.get("/getNoticeList", async (req, res, next) => {
     const data3 = await pool.query(sql3);
     console.log("data3: " + data3);
 
-    const tSQL =
-      " and b.dong_code ='" + dongCode + "' and b.ho_code = '" + hoCode + "' ";
     
+    const tSQL =
+    " and b.dong_code ='" + dongCode + "' and b.ho_code = '" + hoCode + "' ";
 
-    const sql = `select a.idx, a.noti_type as notiType, a.noti_title as notiTitle, DATE_FORMAT(a.start_date, '%Y%m%d') as startDate, a.new_flag as newFlag
+    const checkingSQL = `SELECT IFNULL(MAX(a.idx), 'NORESULT') AS RESULT
+                         FROM t_notice a
+                         INNER JOIN t_notice_send b 
+                         WHERE a.idx = b.idx AND a.start_date <= now() AND end_date >= now() and a.noti_type LIKE ?  ${tSQL}
+                         ;`
+
+    const sql = `select a.idx as idx, a.noti_type as notiType, a.noti_title as notiTitle, DATE_FORMAT(a.start_date, '%Y%m%d') as startDate, a.new_flag as newFlag
                    from t_notice a
                    inner join  t_notice_send b 
                    where  a.idx = b.idx and a.start_date <= now() and end_date >= now() and a.noti_type LIKE ?  ${tSQL}
@@ -72,6 +78,12 @@ router.get("/getNoticeList", async (req, res, next) => {
     console.log("sql=>" + sql);
     console.log("notiType_=> " + notiType_);
     const data = await pool.query(sql, [notiType_, Number(sRow), Number(size)]);
+    const checkingData = await pool.query(checkingSQL, [notiType_]);
+
+    let result = checkingData[0];
+    if(result[0].RESULT == "NORESULT"){
+      return res.json({ resultCode: "05", resultMsg: "없는데이터조회" });
+    }
     let resultList = data[0];
 
     const sql2 = `select count(a.idx) as cnt
@@ -91,7 +103,6 @@ router.get("/getNoticeList", async (req, res, next) => {
       totalCount: resultCnt[0].cnt + "",
       doubleDataFlag,
       data: {
-        //dataType,
         dongCode,
         hoCode,
         notiType,
@@ -102,6 +113,44 @@ router.get("/getNoticeList", async (req, res, next) => {
 
     return res.json(jsonResult);
   } catch (err) {
+    return res.status(500).json(err);
+  }
+});
+
+// 공지사항 등록
+router.post("/postNotice", async (req, res, next) => {
+  let {
+    serviceKey = "", //   서비스 인증키
+    dongCode = "", //     동코드
+    hoCode = "", //       호코드
+    notiType = "", //     공지 타입
+    notiTitle = "", //    공지 제목
+    notiContent = "", //  공지 내용
+    startDate = "", //    공지 시작일
+    endDate = "", //      공지 종료일
+    notiOwer = "", //     공지 주체
+  } = req.body;
+  console.log(serviceKey, dongCode, hoCode, notiType, notiTitle, notiContent, startDate, endDate, notiOwer);
+  try{
+    let sql =`INSERT INTO t_notice(noti_type, noti_title, noti_content, start_date, end_date, noti_owner, insert_date, user_id, new_flag)
+              VALUES(?,?,?,?,?,?,now(),'8888','Y')`;
+    console.log("sql=>" + sql);
+    const data = await pool.query(sql, [
+      notiType,notiTitle,notiContent,startDate,endDate,notiOwer
+    ]);
+    console.log(data[0]);
+    let getIdxSQL = `SELECT idx as idx FROM t_notice WHERE start_date = ? AND end_date = ?`;
+    const getIdx = await pool.query(getIdxSQL, [startDate, endDate]);
+    console.log("getIdx: " + getIdx[0][0].idx);
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+
+    return res.json(jsonResult);
+  } catch (err) {
+    console.log("test===============" + err);
     return res.status(500).json(err);
   }
 });
