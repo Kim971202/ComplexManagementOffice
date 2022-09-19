@@ -1,6 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
+const xlsx = require("xlsx");
+
+
+const testSQL = `SELECT DATE_FORMAT(charge_start_dtime, '%Y-%m-%d-%h-%i-%s') as idx FROM t_ev_charging_log`;
+
+const dowonloadDBToExcel = async () => {
+  const workbook = xlsx.utils.book_new();
+  const evcharging = await pool.query(testSQL);
+
+  const firstSheet = xlsx.utils.json_to_sheet(evcharging, {header : [evcharging[0][0].idx, "charger_ID"]});
+
+  xlsx.utils.book_append_sheet(workbook, firstSheet, "Customers");
+  xlsx.writeFile(workbook, "/Users/donghyunkim/Desktop/complex/ComplexManagementOffice/modules/xlxs/evcharging.xlsx");
+}
+
+dowonloadDBToExcel();
+
 let {
   viewPeriodDate,
   addDays,
@@ -95,22 +112,25 @@ router.get("/getSearchedEVChargingLog", async (req, res, next) => {
 
     let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
 
-    const viewSQL = `select idx, charger_id as chargerID, charger_loc as chargerLoc, 
-                        (
-                          CASE WHEN charger_type = '완속' THEN 'slow'
-                               WHEN charger_type = '급속' THEN 'fast'
-                              ELSE '-'
-                          END
-                        ) as  chargerType,
-                        charger_status as chargerStatus,
-                        DATE_FORMAT(charge_start_dtime, '%Y%m%d%h%i%s') as startDTime, 
-                        DATE_FORMAT(charge_end_dtime, '%Y%m%d%h%i%s') as endDTime,
-                        charge_remain_time as remainTime, use_fee as chargeUseFee, charge_amount as fillingAmount
-                 from t_ev_charging_log 
-                 `;
-    //limit ?, ?
+    const viewSQL = `SELECT idx, charger_id AS chargerID, charger_loc AS chargerLoc, 
+                      (
+                        CASE WHEN charger_type = '완속' THEN 'slow'
+                            WHEN charger_type = '급속' THEN 'fast'
+                            ELSE '-'
+                        END
+                      ) AS  chargerType,
+                      charger_status as chargerStatus,
+                      DATE_FORMAT(charge_start_dtime, '%Y%m%d%h%i%s') AS startDTime, 
+                      DATE_FORMAT(charge_end_dtime, '%Y%m%d%h%i%s') AS endDTime,
+                      charge_remain_time AS remainTime, use_fee AS chargeUseFee, charge_amount AS fillingAmount
+                     F0ROM t_ev_charging_log WHERE ((DATE(charge_start_dtime) >= ? AND DATE(charge_end_dtime) <= ?)) 
+                          AND (dong_code = ? OR ho_code = ?) 
+                          AND charger_loc = ?
+                          AND (CASE WHEN charger_type = '완속' THEN 'slow'WHEN charger_type = '급속' THEN 'fast'ELSE '-' END) = ?
+                          AND charge_amount = ?
+                          AND use_fee = ?;`;
+
     console.log("viewSQL=>" + viewSQL);
-    // [Number(sRow),Number(size)]
     const data = await pool.query(viewSQL);
     let resultList = data[0];
 
