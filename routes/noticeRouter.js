@@ -60,15 +60,14 @@ router.get("/getNoticeList", async (req, res, next) => {
     const data3 = await pool.query(sql3);
     console.log("data3: " + data3);
 
-    
     const tSQL =
-    " and b.dong_code ='" + dongCode + "' and b.ho_code = '" + hoCode + "' ";
+      " and b.dong_code ='" + dongCode + "' and b.ho_code = '" + hoCode + "' ";
 
     const checkingSQL = `SELECT IFNULL(MAX(a.idx), 'NORESULT') AS RESULT
                          FROM t_notice a
                          INNER JOIN t_notice_send b 
                          WHERE a.idx = b.idx AND a.start_date <= now() AND end_date >= now() and a.noti_type LIKE ?  ${tSQL}
-                         ;`
+                         ;`;
 
     const sql = `select a.idx as idx, a.noti_type as notiType, a.noti_title as notiTitle, DATE_FORMAT(a.start_date, '%Y%m%d') as startDate, a.new_flag as newFlag
                    from t_notice a
@@ -81,8 +80,11 @@ router.get("/getNoticeList", async (req, res, next) => {
     const checkingData = await pool.query(checkingSQL, [notiType_]);
 
     let result = checkingData[0];
-    if(result[0].RESULT == "NORESULT"){
-      return res.json({ resultCode: "05", resultMsg: "없는데이터조회" });
+    if (result[0].RESULT == "NORESULT") {
+      return res.json({
+        resultCode: "05",
+        resultMsg: "없는데이터조회하였습니다.",
+      });
     }
     let resultList = data[0];
 
@@ -130,18 +132,41 @@ router.post("/postNotice", async (req, res, next) => {
     endDate = "", //      공지 종료일
     notiOwer = "", //     공지 주체
   } = req.body;
-  console.log(serviceKey, dongCode, hoCode, notiType, notiTitle, notiContent, startDate, endDate, notiOwer);
-  try{
-    let sql =`INSERT INTO t_notice(noti_type, noti_title, noti_content, start_date, end_date, noti_owner, insert_date, user_id, new_flag)
+  console.log(
+    serviceKey,
+    dongCode,
+    hoCode,
+    notiType,
+    notiTitle,
+    notiContent,
+    startDate,
+    endDate,
+    notiOwer
+  );
+  try {
+    let sql = `INSERT INTO t_notice(noti_type, noti_title, noti_content, start_date, end_date, noti_owner, insert_date, user_id, new_flag)
               VALUES(?,?,?,?,?,?,now(),'8888','Y')`;
     console.log("sql=>" + sql);
     const data = await pool.query(sql, [
-      notiType,notiTitle,notiContent,startDate,endDate,notiOwer
+      notiType,
+      notiTitle,
+      notiContent,
+      startDate,
+      endDate,
+      notiOwer,
     ]);
     console.log(data[0]);
     let getIdxSQL = `SELECT idx as idx FROM t_notice WHERE start_date = ? AND end_date = ?`;
     const getIdx = await pool.query(getIdxSQL, [startDate, endDate]);
     console.log("getIdx: " + getIdx[0][0].idx);
+
+    let insertNoticeSendSQL = `INSERT INTO t_notice_send(idx, ho_code, dong_code, send_time, send_result)
+                            VALUES(?,?,?,now(),'Y')`;
+    const noticeSendData = await pool.query(insertNoticeSendSQL, [
+      getIdx[0][0].idx,
+      hoCode,
+      dongCode,
+    ]);
 
     let jsonResult = {
       resultCode: "00",
