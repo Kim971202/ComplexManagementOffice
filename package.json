@@ -20,7 +20,8 @@
   "homepage": "https://github.com/Kim971202/ComplexManagementOffice#readme",
   "dependencies": {
     "express": "^4.18.1",
-    "mysql2": "^2.3.3"
+    "mysql2": "^2.3.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^2.0.19"
