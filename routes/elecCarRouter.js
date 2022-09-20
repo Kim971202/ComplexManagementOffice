@@ -20,7 +20,7 @@ const dowonloadDBToExcel = async () => {
   );
 };
 
-dowonloadDBToExcel();
+// dowonloadDBToExcel();
 
 let {
   viewPeriodDate,
