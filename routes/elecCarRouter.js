@@ -3,18 +3,22 @@ const router = express.Router();
 const pool = require("../DB/dbPool");
 const xlsx = require("xlsx");
 
-
-const testSQL = `SELECT DATE_FORMAT(charge_start_dtime, '%Y-%m-%d-%h-%i-%s') as idx FROM t_ev_charging_log`;
+const evchargingExcelSQL = `SELECT DATE_FORMAT(charge_start_dtime, '%Y-%m-%d-%h-%i-%s') as 시작일, dong_code as dongCode, ho_code as hoCode, charger_loc AS chargerLoc,
+                                  charger_type AS  chargerType,
+                                  charge_amount AS fillingAmount, use_fee AS chargeUseFee  
+                          FROM t_ev_charging_log`;
 
 const dowonloadDBToExcel = async () => {
   const workbook = xlsx.utils.book_new();
-  const evcharging = await pool.query(testSQL);
-
-  const firstSheet = xlsx.utils.json_to_sheet(evcharging, {header : [evcharging[0][0].idx, "charger_ID"]});
-
-  xlsx.utils.book_append_sheet(workbook, firstSheet, "Customers");
-  xlsx.writeFile(workbook, "/Users/donghyunkim/Desktop/complex/ComplexManagementOffice/modules/xlxs/evcharging.xlsx");
-}
+  const evcharging = await pool.query(evchargingExcelSQL);
+  //evcharging[0][0].idx;
+  const firstSheet = xlsx.utils.json_to_sheet(evcharging[0]);
+  xlsx.utils.book_append_sheet(workbook, firstSheet, "전기차 충전이력");
+  xlsx.writeFile(
+    workbook,
+    "C:UsersdsctDesktopCMOComplexManagementOfficemodulesexcelev.xlsx"
+  );
+};
 
 dowonloadDBToExcel();
 
