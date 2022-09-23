@@ -12,105 +12,6 @@ let {
 // 택배 정보 조회
 router.get("/getParcelList", async (req, res, next) => {
   let {
-    serviceKey = "111111111", // 서비스 인증키
-    numOfRows = 10, //           페이지 당 결과수
-    pageNo = 1, //               페이지 번호
-    doubleDataFlag = "Y", //     2배수 데이터 사용여부
-    dongCode = "0000", //        동코드
-    hoCode = "0000", //          호코드
-    parcelStatus = "ALL", //     택배상태:전체(ALL/ 보관함(LOCKER)/반품(RETURN)/수령(RECEIPT)
-    viewPeriod = "ALL", //       조회기간전체: (ALL)/일주일(1WEEK)/1개월(1MONTH)/3개월(3MONTH)
-  } = req.query;
-
-  console.log(
-    serviceKey,
-    numOfRows,
-    pageNo,
-    doubleDataFlag,
-    dongCode,
-    hoCode,
-    parcelStatus,
-    viewPeriod
-  );
-  //http://localhost:3000/parcel/getParcelList?serviceKey=22222&numOfRows=5&pageNo=2&dongCode=101&hoCode=101&doubleDataFlag=Y&parcelStatus=ALL&viewPeriod=ALL
-
-  let parcelStatus_ = "%";
-
-  if (parcelStatus === "LOCKER") parcelStatus_ = "0";
-  else if (parcelStatus === "RETURN") parcelStatus_ = "1";
-  else if (parcelStatus === "RECEIPT") parcelStatus_ = "2";
-  console.log("parcelStatus_=>" + parcelStatus_);
-
-  let resultCode = "00";
-  if (serviceKey === "") resultCode = "10";
-  if (numOfRows === "") resultCode = "10";
-  if (pageNo === "") resultCode = "10";
-  if (dongCode === "") resultCode = "10";
-  if (hoCode === "") resultCode = "10";
-
-  console.log("resulCode=> " + resultCode);
-  if (resultCode !== "00") {
-    return res.json({ resultCode: "01", resultMsg: "에러" });
-  }
-
-  let arrivalTime = viewPeriodDate(viewPeriod);
-  try {
-    let sRow = (pageNo - 1) * numOfRows;
-
-    let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
-
-    const sql = `select DATE_FORMAT(arrival_time, '%Y%m%d%H%i%s') as arrivalDate, 
-        (
-            CASE WHEN parcel_status = 0 THEN '보관함'
-                WHEN parcel_status = 1 THEN '수령'
-                WHEN parcel_status = 2 THEN '반품'
-                ELSE 'not'
-            END
-        ) as parcelStatus, IFNULL(memo, '') as parcelCorp from t_delivery where dong_code = ? and ho_code = ?  and arrival_time >= ? and parcel_status LIKE ? limit ?, ?`;
-    const data = await pool.query(sql, [
-      dongCode,
-      hoCode,
-      arrivalTime,
-      parcelStatus_,
-      Number(sRow),
-      Number(size),
-    ]);
-    let resultList = data[0];
-
-    const sql2 =
-      "select count(*) as cnt from t_delivery where dong_code = ? and ho_code = ? and arrival_time >= ? and parcel_status LIKE ?  ";
-    const data2 = await pool.query(sql2, [
-      dongCode,
-      hoCode,
-      arrivalTime,
-      parcelStatus_,
-    ]);
-
-    let resultCnt = data2[0];
-    let jsonResult = {
-      resultCode,
-      resultMsg: "NORMAL_SERVICE",
-      numOfRows,
-      pageNo,
-      totalCount: resultCnt[0].cnt + "",
-      doubleDataFlag,
-      data: {
-        dongCode,
-        hoCode,
-        parcelStatus,
-        viewPeriod,
-        items: resultList,
-      },
-    };
-
-    return res.json(jsonResult);
-  } catch (err) {
-    return res.status(500).json(err);
-  }
-});
-
-router.get("/getSearchedParcelList", async (req, res, next) => {
-  let {
     arrivalTime = "",
     receiveTime = "",
     dongCode = "",
@@ -136,53 +37,100 @@ router.get("/getSearchedParcelList", async (req, res, next) => {
   console.log("parcelStatus_=>" + parcelStatus_);
 
   try {
-    console.log(dongCode);
-    // 날짜 조건
-    let dateSearch = "";
-    // 동,호 조건
-    let donghoSearch = "";
-    //수령 여부 조건
-    let parcelStatusSearch = "";
-    // 통신결과 조건
-    let sendResultSearch = "";
+    let defaultCondition = `LIKE '%'`;
+    let defaultDongCondition = defaultCondition;
+    let defaultHoCondition = defaultCondition;
+    let defaultParcelStatusCondition = defaultCondition;
+    let defaultSendResultCondition = defaultCondition;
+    let dongCondition = "";
+    let hoCondition = "";
+    let parcelStatusCondition = "";
+    let sendResultCondition = "";
+    let defaultADateCondition = "";
+    let defaultRDateCondition = "";
 
-    // SQL WHERE 조건
-    let whereCondition = "";
-    let andCondition = "";
-    let andCount = 0;
+    // 도착일시 와 수령시간이 없을 경우 Default 날자 값을 넣는다.
+    if (!arrivalTime) {
+      defaultADateCondition = "1900-01-01";
+    }
+    if (!receiveTime) {
+      defaultRDateCondition = "3000-01-01";
+    }
+    if (!!dongCode) {
+      dongCondition = `= '${dongCode}'`;
+      defaultDongCondition = "";
+    }
+    if (!!hoCode) {
+      hoCondition = `= '${hoCode}'`;
+      defaultHoCondition = "";
+    }
+    if (!!parcelStatus) {
+      parcelStatusCondition = `= ${parcelStatus_}`;
+      defaultParcelStatusCondition = "";
+    }
+    if (!!sendResult) {
+      sendResultCondition = `= '${sendResult}'`;
+      defaultSendResultCondition = "";
+    }
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, parcel_flag AS parcelFlag, IFNULL(memo, 'Empty Memo') AS parcelCorp, 
+                        DATE_FORMAT(arrival_time, '%Y-%m-%d %h:%i:%s') AS arrivalTime, DATE_FORMAT(receive_time, '%Y-%m-%d %h:%i:%s') AS receiveTime,
+                        send_result AS sendResult
+                FROM t_delivery
+                WHERE (DATE(arrival_time) >= '${defaultADateCondition} ${arrivalTime}' AND DATE(receive_time) <= '${defaultRDateCondition} ${receiveTime}') 
+                      AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
+                      AND parcel_status ${defaultParcelStatusCondition} ${parcelStatusCondition}
+                      AND send_result ${defaultSendResultCondition} ${sendResultCondition};`;
 
-    if (
-      !arrivalTime &&
-      !receiveTime &&
-      !dongCode &&
-      !hoCode &&
-      !parcelStatus &&
-      !sendResult
-    ) {
-      console.log("선택된 조건이 없습니다.");
-    }
-    if (!!arrivalTime) {
-      whereCondition = "WHERE";
-    }
-    if (!!arrivalTime && !!receiveTime) {
-      andCount++;
-      dateSearch = `(DATE(arrival_time) >= '${arrivalTime}' AND DATE(receive_time) <= '${receiveTime}')`;
-    }
-    if (!!dongCode && !!hoCode) {
-      andCount++;
-      donghoSearch = `(dong_code = '${dongCode}' OR ho_code = '${hoCode}')`;
-    }
-    if (andCount == 2) {
-      andCondition = "AND";
-    }
-
-    const sql = `SELECT dong_code FROM t_delivery ${whereCondition} ${dateSearch} ${andCondition} ${donghoSearch}`;
     console.log("sql: " + sql);
     const data = await pool.query(sql);
     let resultList = data[0];
     let jsonResult = {
       resultList,
     };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+router.post("/postParcel", async (req, res, next) => {
+  let {
+    arrivalTime = "",
+    parcelStatus = 0,
+    dongCode = "",
+    hoCode = "",
+    memo = "",
+  } = req.query;
+
+  console.log(arrivalTime, parcelStatus, dongCode, hoCode, memo);
+  try {
+    parcelBoxNo = "00" + 1;
+    mailBoxNo = "0" + 1;
+    receiver = `${dongCode} - ${hoCode}`;
+    del_fee = 1000;
+    parcelFlage = "유인";
+
+    let sql = `INSERT INTO t_delivery(arrival_time, parcel_box_no, mail_box_no, receiver, del_fee, dong_code, ho_code, receive_time, parcel_status, parcel_flag, user_id, send_time, send_result, memo)
+                 VALUES(DATE_FORMAT(?,"%y-%m-%d"),?,?,?,?,?,?,now(),?,?,'tester',now(),'Y',?)`;
+    const data = await pool.query(sql, [
+      arrivalTime,
+      parcelBoxNo,
+      mailBoxNo,
+      receiver,
+      del_fee,
+      dongCode,
+      hoCode,
+      parcelStatus,
+      parcelFlage,
+      memo,
+    ]);
+    console.log("data[0]=>" + data[0]);
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+
     return res.json(jsonResult);
   } catch (error) {
     return res.status(500).json(error);
