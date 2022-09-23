@@ -2,7 +2,41 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
 
-//공지사항 목록조회
+// 공지사항 상세보기
+router.get("/getDetailedNoticeList", async (req, res, next) => {
+  let { idx = "" } = req.body;
+  console.log(idx);
+  try {
+    const updateSQL = `UPDATE t_notice_send SET send_result = 'Y' WHERE idx = ?`;
+    const updateSQLData = await pool.query(updateSQL, [idx]);
+    console.log("updateSQLData: " + updateSQLData);
+
+    const sql = `SELECT a.noti_title AS notiTitle, a.noti_content AS notiContent, 
+                        DATE_FORMAT(a.start_date, '%Y-%m-%d %h:%m:%s') AS startDate, 
+                        DATE_FORMAT(a.end_date, '%Y-%m-%d') AS endDate, 
+                        b.send_result AS sendResult, a.noti_type AS notiType
+                 FROM t_notice a
+                 INNER JOIN t_notice_send b
+                 WHERE a.idx = b.idx AND a.idx = ?`;
+    const data = await pool.query(sql, [idx]);
+
+    console.log("sql: " + sql);
+    let resultList = data[0];
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      data: {
+        resultList,
+      },
+    };
+
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+// 공지사항 목록조회
 router.get("/getNoticeList", async (req, res, next) => {
   let {
     serviceKey = "111111111", // 서비스 인증키
@@ -122,7 +156,6 @@ router.get("/getNoticeList", async (req, res, next) => {
 // 공지사항 등록
 router.post("/postNotice", async (req, res, next) => {
   let {
-    serviceKey = "", //   서비스 인증키
     dongCode = "", //     동코드
     hoCode = "", //       호코드
     notiType = "", //     공지 타입
@@ -133,7 +166,6 @@ router.post("/postNotice", async (req, res, next) => {
     notiOwer = "", //     공지 주체
   } = req.body;
   console.log(
-    serviceKey,
     dongCode,
     hoCode,
     notiType,
@@ -145,7 +177,7 @@ router.post("/postNotice", async (req, res, next) => {
   );
   try {
     let sql = `INSERT INTO t_notice(noti_type, noti_title, noti_content, start_date, end_date, noti_owner, insert_date, user_id, new_flag)
-              VALUES(?,?,?,?,?,?,now(),'8888','Y')`;
+               VALUES(?,?,?,DATE_FORMAT(?,"%y-%m-%d"),DATE_FORMAT(?,"%y-%m-%d"),?,now(),'8888','N')`;
     console.log("sql=>" + sql);
     const data = await pool.query(sql, [
       notiType,
@@ -161,12 +193,14 @@ router.post("/postNotice", async (req, res, next) => {
     console.log("getIdx: " + getIdx[0][0].idx);
 
     let insertNoticeSendSQL = `INSERT INTO t_notice_send(idx, ho_code, dong_code, send_time, send_result)
-                            VALUES(?,?,?,now(),'Y')`;
+                            VALUES(?,?,?,now(),'N')`;
     const noticeSendData = await pool.query(insertNoticeSendSQL, [
       getIdx[0][0].idx,
       hoCode,
       dongCode,
     ]);
+
+    console.log("noticeSendData: " + noticeSendData);
 
     let jsonResult = {
       resultCode: "00",
