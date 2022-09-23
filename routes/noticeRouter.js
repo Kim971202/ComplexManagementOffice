@@ -153,7 +153,7 @@ router.get("/getNoticeList", async (req, res, next) => {
   }
 });
 
-// 공지사항 등록
+// 공지사항 등록 (개별, 전체)
 router.post("/postNotice", async (req, res, next) => {
   let {
     dongCode = "", //     동코드
@@ -176,6 +176,11 @@ router.post("/postNotice", async (req, res, next) => {
     notiOwer
   );
   try {
+    let countSQL = `SELECT COUNT(ho_code) AS hCount FROM t_dongho WHERE dong_code = ?;`;
+    const countData = await pool.query(countSQL, [dongCode]);
+
+    console.log(countData[0][0].hCount);
+
     let sql = `INSERT INTO t_notice(noti_type, noti_title, noti_content, start_date, end_date, noti_owner, insert_date, user_id, new_flag)
                VALUES(?,?,?,DATE_FORMAT(?,"%y-%m-%d"),DATE_FORMAT(?,"%y-%m-%d"),?,now(),'8888','N')`;
     console.log("sql=>" + sql);
@@ -188,19 +193,17 @@ router.post("/postNotice", async (req, res, next) => {
       notiOwer,
     ]);
     console.log(data[0]);
-    let getIdxSQL = `SELECT idx as idx FROM t_notice WHERE start_date = ? AND end_date = ?`;
+    let getIdxSQL = `SELECT idx as idx FROM t_notice WHERE start_date = ? AND end_date = ? `;
     const getIdx = await pool.query(getIdxSQL, [startDate, endDate]);
     console.log("getIdx: " + getIdx[0][0].idx);
 
     let insertNoticeSendSQL = `INSERT INTO t_notice_send(idx, ho_code, dong_code, send_time, send_result)
-                            VALUES(?,?,?,now(),'N')`;
+                               VALUES(?,?,?,now(),'N')`;
     const noticeSendData = await pool.query(insertNoticeSendSQL, [
       getIdx[0][0].idx,
       hoCode,
       dongCode,
     ]);
-
-    console.log("noticeSendData: " + noticeSendData);
 
     let jsonResult = {
       resultCode: "00",

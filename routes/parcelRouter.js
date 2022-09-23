@@ -111,7 +111,7 @@ router.post("/postParcel", async (req, res, next) => {
     parcelFlage = "유인";
 
     let sql = `INSERT INTO t_delivery(arrival_time, parcel_box_no, mail_box_no, receiver, del_fee, dong_code, ho_code, receive_time, parcel_status, parcel_flag, user_id, send_time, send_result, memo)
-                 VALUES(DATE_FORMAT(?,"%y-%m-%d"),?,?,?,?,?,?,now(),?,?,'tester',now(),'Y',?)`;
+               VALUES(DATE_FORMAT(?,"%y-%m-%d"),?,?,?,?,?,?,now(),?,?,'tester',now(),'Y',?)`;
     const data = await pool.query(sql, [
       arrivalTime,
       parcelBoxNo,

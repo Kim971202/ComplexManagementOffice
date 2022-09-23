@@ -55,10 +55,11 @@ router.get("/getCarLocationList", async (req, res, next) => {
 
     sql = `SELECT  ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, tag_id AS tagId, pos_desc AS posDesc, 
                                 DATE_FORMAT(pos_update_date, '%Y-%m-%d %h:%i:%s') as posUpdateDate
-                        FROM t_parking_loc 
-                        WHERE (DATE(pos_update_date) >= '${defaultStartDateCondition} ${startTime}' AND DATE(pos_update_date) <= '${defaultEndDateCondition} ${endTime}')  
-                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
-                        AND tag_name ${defaultTagNameCondition} ${tagNameCondition}`;
+           FROM t_parking_loc 
+           WHERE (DATE(pos_update_date) >= '${defaultStartDateCondition} ${startTime}' AND DATE(pos_update_date) <= '${defaultEndDateCondition} ${endTime}')  
+                 AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
+                 AND tag_name ${defaultTagNameCondition} ${tagNameCondition}`;
+
     const data = await pool.query(sql);
     console.log("sql: " + sql);
     let resultList = data[0];
@@ -82,7 +83,7 @@ router.get("/getDetailedCarLocationList", async (req, res, next) => {
   console.log(idx);
 
   parkingDeatiledSQL = `SELECT dong_code AS dongCode, ho_code as hoCode, tag_id AS tagID, pos_desc AS posDesc, CONCAT("X: ", pos_x, " ", "Y: ",pos_y) AS POSITION,
-                             floor_name AS floorName, building_name AS buildingName, DATE_FORMAT(pos_update_date, '%Y-%m-%d %h:%i:%s') AS posUpdateDate
+                               floor_name AS floorName, building_name AS buildingName, DATE_FORMAT(pos_update_date, '%Y-%m-%d %h:%i:%s') AS posUpdateDate
                         FROM t_parking_loc
                         WHERE idx = ? `;
   const data = await pool.query(parkingDeatiledSQL, [idx]);
