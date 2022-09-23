@@ -10,63 +10,67 @@ let {
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
 
-// 주차위치 정보 전체 조회
-router.get("/getALLCarLocationList", async (req, res, next) => {
-  parkingALLSQL = `SELECT  ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, tag_id AS tagId, pos_desc AS posDesc, 
-                           DATE_FORMAT(pos_update_date, '%Y-%m-%d-%h-%i-%s') as posUpdateDate
-                   FROM t_parking_loc`;
-
-  const data = await pool.query(parkingALLSQL);
-  let resultList = data[0];
-  console.log(resultList);
-  try {
-    {
-      let jsonResult = {
-        resultCode: "00",
-        resultMsg: "NORMAL_SERVICE",
-        data: {
-          items: resultList,
-        },
-      };
-      return res.json(jsonResult);
-    }
-  } catch (error) {
-    return res.status(500).json(error);
-  }
-});
-
-// 주차위치 정보 검색 조회
-router.get("/getSearchedCarLocationList", async (req, res, next) => {
+// 주차위치 정보 조회
+router.get("/getCarLocationList", async (req, res, next) => {
   let {
-    dongCode = "0000", //        동코드
-    hoCode = "0000", //          호코드
-    posDesc = "",
-    viewPeriod = "ALL", //       조회기간전체: (ALL)/일주일(1WEEK)/1개월(1MONTH)/3개월(3MONTH)
+    dongCode = "", //        동코드
+    hoCode = "", //          호코드
+    startTime = "",
+    endTime = "",
+    tagName = "", // 차량번호
   } = req.query;
 
-  console.log(dongCode, hoCode, posDesc, viewPeriod);
-  //http://localhost:3000/location/getLocationList?serviceKey=11111111&numOfRows=10&pageNo=1&doublDataFlag=Y&dongCode=101&hoCode=101&locFlag=FAMILY&viewPeriod=ALL
-  let sDate = viewPeriodDate(viewPeriod);
+  console.log(dongCode, hoCode, startTime, endTime, tagName);
 
-  parkingSearchSQL = `SELECT  ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, tag_id AS tagId, pos_desc AS posDesc, 
-                        DATE_FORMAT(pos_update_date, '%Y-%m-%d-%h-%i-%s') as posUpdateDate
-                FROM t_parking_loc 
-                WHERE DATE(pos_update_date) >= '${sDate}' AND (dong_code = ? OR ho_code = ? ) AND pos_desc = ?;`;
-  const data = await pool.query(parkingSQL, [dongCode, hoCode, posDesc]);
-  let resultList = data[0];
-  console.log(resultList);
   try {
-    {
-      let jsonResult = {
-        resultCode: "00",
-        resultMsg: "NORMAL_SERVICE",
-        data: {
-          viewPeriod,
-          items: resultList,
-        },
-      };
-      return res.json(jsonResult);
+    let defaultCondition = `LIKE '%'`;
+    let defaultStartDateCondition = "";
+    let defaultEndDateCondition = "";
+    let defaultDongCondition = defaultCondition;
+    let defaultHoCondition = defaultCondition;
+    let defaultTagNameCondition = defaultCondition;
+
+    let dongCondition = "";
+    let hoCondition = "";
+    let tagNameCondition = "";
+
+    if (!startTime) {
+      defaultStartDateCondition = "1900-01-01";
     }
+    if (!endTime) {
+      defaultEndDateCondition = "3000-01-01";
+    }
+    if (!!dongCode) {
+      dongCondition = `= '${dongCode}'`;
+      defaultDongCondition = "";
+    }
+    if (!!hoCode) {
+      hoCondition = `= '${hoCode}'`;
+      defaultHoCondition = "";
+    }
+    if (!!tagName) {
+      tagNameCondition = `= '${tagName}'`;
+      defaultTagNameCondition = "";
+    }
+
+    sql = `SELECT  ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, tag_id AS tagId, pos_desc AS posDesc, 
+                                DATE_FORMAT(pos_update_date, '%Y-%m-%d %h:%i:%s') as posUpdateDate
+                        FROM t_parking_loc 
+                        WHERE (DATE(pos_update_date) >= '${defaultStartDateCondition} ${startTime}' AND DATE(pos_update_date) <= '${defaultEndDateCondition} ${endTime}')  
+                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
+                        AND tag_name ${defaultTagNameCondition} ${tagNameCondition}`;
+    const data = await pool.query(sql);
+    console.log("sql: " + sql);
+    let resultList = data[0];
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      data: {
+        items: resultList,
+      },
+    };
+    return res.json(jsonResult);
   } catch (error) {
     return res.status(500).json(error);
   }
