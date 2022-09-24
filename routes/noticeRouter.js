@@ -39,47 +39,45 @@ router.get("/getDetailedNoticeList", async (req, res, next) => {
 // 공지사항 목록조회
 router.get("/getNoticeList", async (req, res, next) => {
   let {
-    serviceKey = "111111111", // 서비스 인증키
-    numOfRows = 10, //           페이지 당 결과수
-    pageNo = 1, //               페이지 번호
-    doubleDataFlag = "Y", //     2배수 데이터 사용여부
-    dongCode = "0000", //        동코드
-    hoCode = "0000", //          호코드
-    notiType = "ALL", //           공지타입 : 전체데이터(ALL), 전체공지(1), 세대 개별공지(2)
+   startDate = "",
+   endDate = "",
+   notiType = "",
+   sendResult = "",
+   notiContent = ""
   } = req.query;
 
   console.log(
-    serviceKey,
-    numOfRows,
-    pageNo,
-    dongCode,
-    hoCode,
-    doubleDataFlag,
-    notiType
+    startDate, endDate, notiType, sendResult, notiContent
   );
-  //http://localhost:3000/notice/getNoticeList?serviceKey=22222&numOfRows=5&pageNo=2&dongCode=101&hoCode=101&doubleDataFlag=Y&notiType=ALL
 
-  let resultCode = "00";
+  try {    
+    let defaultCondition = `LIKE '%'`;
+    let defaultNotiTypeCondtion = defaultCondition;
+    let defaultSendResultCondition = defaultCondition;
+    let defaultNotiContentCondtion = defaultCondition;
 
-  if (serviceKey === "") resultCode = "10";
-  if (numOfRows === "") resultCode = "10";
-  if (pageNo === "") resultCode = "10";
-  if (dongCode === "") resultCode = "10";
-  if (hoCode === "") resultCode = "10";
-  if (notiType === "") resultCode = "10";
+    let notiTypeCondition = "";
+    let sendResultCondition = "";
+    let notiContentCondition = ""
 
-  console.log("resulCode=> " + resultCode);
-  if (resultCode !== "00") {
-    return res.json({ resultCode: "01", resultMsg: "에러" });
-  }
-
-  try {
-    let sRow = (pageNo - 1) * numOfRows;
-    //console.log("sRow = %d", sRow);
-    //ex: 2page start = (2-1) * 10
-
-    let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
-    //console.log("size= %d", size);
+    if(!startDate){
+      let defaultStartDate = "1990-01-01";
+    }
+    if(!endDate){
+      let defaultEndDate = "3000-01-01";
+    }
+    if(!!notiType){
+      notiTypeCondition = `= '${notiType}'`
+      defaultNotiTypeCondtion = "";
+    }
+    if(!!sendResult){
+      sendResultCondition = `= ${sendResult}`
+      defaultSendResultCondition = "";
+    }
+    if(!!notiContent){
+      notiContentCondition = `= ${notiContent}`
+      defaultNotiContentCondtion = ""
+    }
 
     let notiType_ = "%";
     if (notiType === "1") notiType_ = "전체";
@@ -103,46 +101,37 @@ router.get("/getNoticeList", async (req, res, next) => {
                          WHERE a.idx = b.idx AND a.start_date <= now() AND end_date >= now() and a.noti_type LIKE ?  ${tSQL}
                          ;`;
 
-    const sql = `select a.idx as idx, a.noti_type as notiType, a.noti_title as notiTitle, DATE_FORMAT(a.start_date, '%Y%m%d') as startDate, a.new_flag as newFlag
-                   from t_notice a
-                   inner join  t_notice_send b 
-                   where  a.idx = b.idx and a.start_date <= now() and end_date >= now() and a.noti_type LIKE ?  ${tSQL}
-                   limit ?, ?`;
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, noti_type AS notiType, noti_title AS notiTitle, noti_owner AS notiOwner,
+                        DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate,
+                        DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate
+                        send_result AS sendResult
+                        FROM t_notice a
+                        INNER JOIN t_notice_send b
+                        WHERE a.idx = b.idx 
+                              AND (DATE(start_date) >= '${defaultStartDate} ${startDate}' AND (DATE(end_date) <= '${defaultEndDate} ${endDate}'))
+                              AND noti_type ${defaultCondition} ${notiTypeCondition}
+                              AND send_result ${defaultCondition} ${sendResultCondition}
+                              AND noti_content ${defaultNotiContentCondtion} ${notiContentCondition}`;
     console.log("sql=>" + sql);
     console.log("notiType_=> " + notiType_);
     const data = await pool.query(sql, [notiType_, Number(sRow), Number(size)]);
     const checkingData = await pool.query(checkingSQL, [notiType_]);
 
     let result = checkingData[0];
-    if (result[0].RESULT == "NORESULT") {
-      return res.json({
-        resultCode: "05",
-        resultMsg: "없는데이터조회하였습니다.",
-      });
-    }
     let resultList = data[0];
 
     const sql2 = `select count(a.idx) as cnt
                    from t_notice a
                    inner join  t_notice_send b 
                    where a.idx = b.idx and a.start_date <= now() and end_date >= now() and a.noti_type LIKE ?  ${tSQL};`;
-    //const sql2 = "select count(*) as cnt from t_notice where noti_type = ?";
     console.log("notiType_=> " + notiType_);
-    const data2 = await pool.query(sql2, [notiType_]);
-    let resultCnt = data2[0];
+    const data2 = await pool.query(sql2);
 
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
-      numOfRows,
-      pageNo,
-      totalCount: resultCnt[0].cnt + "",
-      doubleDataFlag,
       data: {
-        dongCode,
-        hoCode,
-        notiType,
-        items: resultList,
+        resultList,
       },
     };
     // console.log(resultList);
