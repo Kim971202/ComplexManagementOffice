@@ -42,6 +42,7 @@ router.get("/getParcelList", async (req, res, next) => {
     let defaultHoCondition = defaultCondition;
     let defaultParcelStatusCondition = defaultCondition;
     let defaultSendResultCondition = defaultCondition;
+    
     let dongCondition = "";
     let hoCondition = "";
     let parcelStatusCondition = "";
