@@ -32,138 +32,79 @@ let {
 
 //TODO: excel 다운로드 추가
 
-//전기차충전 이력 리스트 전체 조회
-router.get("/getAllEVChargingLog", async (req, res, next) => {
-  let {
-    serviceKey = "111111111", // 서비스 인증키
-    numOfRows = 10, //           페이지 당 결과수
-    pageNo = 1, //               페이지 번호
-    doubleDataFlag = "Y", //     2배수 데이터 사용여부
-    dongCode = "0000", //        동코드
-    hoCode = "0000", //          호코드
-  } = req.query;
-
-  console.log(serviceKey, numOfRows, pageNo, dongCode, hoCode, doubleDataFlag);
-  //http://localhost:3000/evcharging/getEVChargingLog?serviceKey=22222&numOfRows=5&pageNo=1&dongCode=101&hoCode=101&doubleDataFlag=Y
-  //&viewPeriod=ALL
-  try {
-    let sRow = (pageNo - 1) * numOfRows;
-
-    let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
-
-    const viewSQL = `select idx, charger_id as chargerID, charger_loc as chargerLoc, 
-                        (
-                          CASE WHEN charger_type = '완속' THEN 'slow'
-                               WHEN charger_type = '급속' THEN 'fast'
-                              ELSE '-'
-                          END
-                        ) as  chargerType,
-                        charger_status as chargerStatus,
-                        DATE_FORMAT(charge_start_dtime, '%Y%m%d%h%i%s') as startDTime, 
-                        DATE_FORMAT(charge_end_dtime, '%Y%m%d%h%i%s') as endDTime,
-                        charge_remain_time as remainTime, use_fee as chargeUseFee, charge_amount as fillingAmount
-                 from t_ev_charging_log 
-                 `;
-    //limit ?, ?
-    console.log("viewSQL=>" + viewSQL);
-    // [Number(sRow),Number(size)]
-    const data = await pool.query(viewSQL);
-    let resultList = data[0];
-
-    const sql2 =
-      "select count(*) as cnt from t_ev_charging_log where dong_code = ? and ho_code = ?";
-    const data2 = await pool.query(sql2, [dongCode, hoCode]);
-
-    let resultCnt = data2[0];
-
-    console.log("resultList : ", resultList);
-
-    let jsonResult = {
-      resultCode: "00",
-      resultMsg: "NORMAL_SERVICE",
-      numOfRows,
-      pageNo,
-      totalCount: resultCnt[0].cnt + "",
-      doubleDataFlag,
-      data: {
-        dongCode,
-        hoCode,
-        items: resultList,
-      },
-    };
-
-    return res.json(jsonResult);
-  } catch (err) {
-    return res.status(500).json(err);
-  }
-});
-//전기차충전 이력 리스트 검색 조회
+//전기차충전 이력 리스트 조회
 router.get("/getSearchedEVChargingLog", async (req, res, next) => {
   let {
-    serviceKey = "111111111", // 서비스 인증키
-    numOfRows = 10, //           페이지 당 결과수
-    pageNo = 1, //               페이지 번호
-    doubleDataFlag = "Y", //     2배수 데이터 사용여부
-    dongCode = "0000", //        동코드
-    hoCode = "0000", //          호코드
+    starTime = "",
+    endTime = "",
+    chargerLoc = "",
+    dongCode = "", //        동코드
+    hoCode = "", //          호코드
   } = req.query;
 
-  console.log(serviceKey, numOfRows, pageNo, dongCode, hoCode, doubleDataFlag);
-  //http://localhost:3000/evcharging/getEVChargingLog?serviceKey=22222&numOfRows=5&pageNo=1&dongCode=101&hoCode=101&doubleDataFlag=Y
-  //&viewPeriod=ALL
+  console.log(starTime, endTime, chargerLoc, dongCode, hoCode);
+
   try {
-    let sRow = (pageNo - 1) * numOfRows;
 
-    let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
+    let defaultCondition = `Like '%'`;
+    let defaultChargerLocCondition = defaultCondition;
+    let defaultDongCondition = defaultCondition;
+    let defaultHoCondition = defaultCondition;
 
-    const viewSQL = `SELECT idx, charger_id AS chargerID, charger_loc AS chargerLoc, 
-                      (
-                        CASE WHEN charger_type = '완속' THEN 'slow'
-                            WHEN charger_type = '급속' THEN 'fast'
-                            ELSE '-'
-                        END
-                      ) AS  chargerType,
-                      charger_status as chargerStatus,
-                      DATE_FORMAT(charge_start_dtime, '%Y%m%d%h%i%s') AS startDTime, 
-                      DATE_FORMAT(charge_end_dtime, '%Y%m%d%h%i%s') AS endDTime,
-                      charge_remain_time AS remainTime, use_fee AS chargeUseFee, charge_amount AS fillingAmount
-                     F0ROM t_ev_charging_log WHERE ((DATE(charge_start_dtime) >= ? AND DATE(charge_end_dtime) <= ?)) 
-                          AND (dong_code = ? OR ho_code = ?) 
-                          AND charger_loc = ?
-                          AND (CASE WHEN charger_type = '완속' THEN 'slow'WHEN charger_type = '급속' THEN 'fast'ELSE '-' END) = ?
-                          AND charge_amount = ?
-                          AND use_fee = ?;`;
+    let defaultStartTimeCondition = "";
+    let defaultEndTimeCondition = "";
 
-    console.log("viewSQL=>" + viewSQL);
-    const data = await pool.query(viewSQL);
+    let dongCondition = "";
+    let hoCondition = "";
+    let chargerLocCondition = "";
+
+    if (!starTime) {
+      defaultStartTimeCondition = "1900-01-01";
+    }
+    if (!endTime) {
+      defaultEndTimeCondition = "3000-01-01";
+    }
+    if(!!dongCode){
+      dongCondition = `= '${dongCode}'`;
+      defaultDongCondition = "";
+    }
+    if(!!hoCode){
+      hoCondition = `= '${hoCode}'`;
+      defaultHoCondition = "";
+    }
+    if(!!chargerLoc){
+      chargerLocCondition = `= '${chargerLoc}'`;
+      defaultChargerLocCondition = "";
+    }
+
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, 
+                        charger_loc AS chargerLoc, charger_type AS chargerType, charge_amount AS chargeAmount,
+                        DATE_FORMAT(charge_start_dtime, '%Y-%m-%d %h:%i:%s') AS chargeStartDtime,
+                        DATE_FORMAT(charge_end_dtime, '%Y-%m-%d %h:%i:%s') AS chargeEndDtime,
+                        use_fee AS useFee
+                 FROM t_ev_charging_log
+                 WHERE (DATE(charge_start_dtime) >= '${defaultStartTimeCondition} ${starTime}' AND DATE(charge_end_dtime) <= '${defaultEndTimeCondition} ${endTime}') 
+                       AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
+                       AND charger_loc ${defaultChargerLocCondition} ${chargerLocCondition}`;
+
+    console.log("sql: " + sql);
+    const data = await pool.query(sql);
     let resultList = data[0];
-
-    const sql2 =
-      "select count(*) as cnt from t_ev_charging_log where dong_code = ? and ho_code = ?";
-    const data2 = await pool.query(sql2, [dongCode, hoCode]);
-
-    let resultCnt = data2[0];
-
-    console.log("resultList : ", resultList);
 
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
-      numOfRows,
-      pageNo,
-      totalCount: resultCnt[0].cnt + "",
-      doubleDataFlag,
       data: {
-        dongCode,
-        hoCode,
-        items: resultList,
+        resultList,
       },
     };
 
     return res.json(jsonResult);
-  } catch (err) {
-    return res.status(500).json(err);
+  } catch (error) {
+    return res.status(500).json(error);
   }
+   
+   
 });
 //전기차충전 이력 리스트 상세조회
 router.get("/getDeatiledEVChargingLog", async (req, res, next) => {
