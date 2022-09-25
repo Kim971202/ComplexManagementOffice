@@ -112,6 +112,7 @@ router.get("/getNoticeList", async (req, res, next) => {
                               AND noti_type ${defaultCondition} ${notiTypeCondition}
                               AND send_result ${defaultCondition} ${sendResultCondition}
                               AND noti_content ${defaultNotiContentCondtion} ${notiContentCondition}`;
+                              
     console.log("sql=>" + sql);
     console.log("notiType_=> " + notiType_);
     const data = await pool.query(sql, [notiType_, Number(sRow), Number(size)]);
@@ -165,11 +166,6 @@ router.post("/postNotice", async (req, res, next) => {
     notiOwer
   );
   try {
-    let countSQL = `SELECT COUNT(ho_code) AS hCount FROM t_dongho WHERE dong_code = ?;`;
-    const countData = await pool.query(countSQL, [dongCode]);
-
-    console.log(countData[0][0].hCount);
-
     let sql = `INSERT INTO t_notice(noti_type, noti_title, noti_content, start_date, end_date, noti_owner, insert_date, user_id, new_flag)
                VALUES(?,?,?,DATE_FORMAT(?,"%y-%m-%d"),DATE_FORMAT(?,"%y-%m-%d"),?,now(),'8888','N')`;
     console.log("sql=>" + sql);
@@ -181,18 +177,32 @@ router.post("/postNotice", async (req, res, next) => {
       endDate,
       notiOwer,
     ]);
-    console.log(data[0]);
-    let getIdxSQL = `SELECT idx as idx FROM t_notice WHERE start_date = ? AND end_date = ? `;
-    const getIdx = await pool.query(getIdxSQL, [startDate, endDate]);
+
+    let countSQL = `SELECT ho_code AS hoCode, 
+                    (SELECT COUNT(ho_code) AS hCount FROM t_dongho WHERE dong_code = ?) AS hCount 
+                    FROM t_dongho WHERE dong_code = ?`;
+    const countData = await pool.query(countSQL, [dongCode, dongCode]);
+    console.log(countData[0])
+    
+    let getIdxSQL = `SELECT idx as idx FROM t_notice ORDER BY idx DESC LIMIT 1`;
+    const getIdx = await pool.query(getIdxSQL);
     console.log("getIdx: " + getIdx[0][0].idx);
 
     let insertNoticeSendSQL = `INSERT INTO t_notice_send(idx, ho_code, dong_code, send_time, send_result)
                                VALUES(?,?,?,now(),'N')`;
-    const noticeSendData = await pool.query(insertNoticeSendSQL, [
-      getIdx[0][0].idx,
-      hoCode,
-      dongCode,
-    ]);
+                              
+    if(notiType == "개별"){
+      const noticeSendData = await pool.query(insertNoticeSendSQL, [
+        getIdx[0][0].idx,
+        hoCode,
+        dongCode,
+      ]);
+    } else if (notiType == "전체"){
+      for(i = 0; i < countData[0][0].hCount; i++){
+        const notiData = await pool.query(insertNoticeSendSQL, [getIdx[0][0].idx, countData[0][i].hoCode, dongCode]);
+      }
+    }       
+
 
     let jsonResult = {
       resultCode: "00",
