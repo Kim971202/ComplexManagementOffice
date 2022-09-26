@@ -9,88 +9,100 @@ let {
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
 
-//입출차 리스트 조회
+//엘리베이터 이력 조회
 router.get("/getElevatorCallLog", async (req, res, next) => {
   let {
-    serviceKey = "111111111", // 서비스 인증키
-    numOfRows = 10, //           페이지 당 결과수
-    pageNo = 1, //               페이지 번호
-    doubleDataFlag = "Y", //     2배수 데이터 사용여부
-    dongCode = "0000", //        동코드
-    hoCode = "0000", //          호코드
-    viewPeriod = "ALL", //       조회기간전체: (ALL)/일주일(1WEEK)/1개월(1MONTH)/3개월(3MONTH)
+    startDate = "",
+    endDate = "",
+    reqMethod = "",
+    elvDirection = "",
+    commResult = "",
+    dongCode = "",
+    hoCode = "",
   } = req.query;
 
   console.log(
-    serviceKey,
-    numOfRows,
-    pageNo,
+    startDate,
+    endDate,
+    reqMethod,
+    elvDirection,
+    commResult,
     dongCode,
-    hoCode,
-    doubleDataFlag,
-    viewPeriod
+    hoCode
   );
-  //http://localhost:3000/elv/getElevatorCallLog?serviceKey=22222&numOfRows=5&pageNo=2&dongCode=101&hoCode=101&doubleDataFlag=Y&viewPeriod=ALL
-
-  let startDate = viewPeriodDate(viewPeriod);
-
-  console.log("startDate : ", startDate);
 
   try {
-    let sRow = (pageNo - 1) * numOfRows;
-    //console.log("sRow = %d", sRow);
-    //ex: 2page start = (2-1) * 10
+    let defaultCondition = `LIKE '%'`;
 
-    let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
-    //console.log("size= %d", size);
+    let defaultReqMethodCondition = defaultCondition;
+    let defaultElvDirectionCondition = defaultCondition;
+    let defaultCommResultCondition = defaultCondition;
+    let defaultDongCondition = defaultCondition;
+    let defaultHoCondition = defaultCondition;
 
-    //     from t_elevator_control where dong_code = ? and ho_code = ? and control_req_dtime >= ?
-    const sql = `select DATE_FORMAT(control_req_dtime, '%Y%m%d%h%i%s') as controlReqDTime, 
-                      (
-                        CASE WHEN comm_result = 'Y' THEN '성공'
-                            ELSE '실패'
-                        END
-                      ) as  commResult,
-                      direction
-                 from t_elevator_control where dong_code = ? and ho_code = ? and control_req_dtime >= ?;`;
+    let defaultStartDateCondition = "";
+    let defaultEndDateCondition = "";
 
-    console.log("sql=>" + sql);
-    const data = await pool.query(sql, [
-      dongCode,
-      hoCode,
-      startDate,
-      Number(sRow),
-      Number(size),
-    ]);
+    let reqMethodCondition = "";
+    let elvDirectionCondition = "";
+    let commResultConditCondition = "";
+    let dongCondition = "";
+    let hoCondition = "";
+
+    if (!startDate) {
+      defaultStartDateCondition = "1900-01-01";
+    }
+    if (!endDate) {
+      defaultEndDateCondition = "3000-01-01";
+    }
+
+    if (!!reqMethod) {
+      reqMethodCondition = `= '${reqMethod}'`;
+      defaultReqMethodCondition = "";
+    }
+
+    if (!!elvDirection) {
+      elvDirectionCondition = `= '${elvDirection}'`;
+      defaultElvDirectionCondition = "";
+    }
+
+    if (!!commResult) {
+      commResultConditCondition = `= '${commResult}'`;
+      defaultCommResultCondition = "";
+    }
+
+    if (!!dongCode) {
+      dongCondition = `= '${dongCode}'`;
+      defaultDongCondition = "";
+    }
+    if (!!hoCode) {
+      hoCondition = `= '${hoCode}'`;
+      defaultHoCondition = "";
+    }
+
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, DATE_FORMAT(control_req_dtime, '%Y-%m-%d %h:%i:%s') AS controlReqDTime, req_method AS reqMethod,
+                        direction, dong_code AS dong_code, ho_code AS hoCode, DATE_FORMAT(comm_dtime, '%h:%i:%s') AS commDTime,
+                        comm_result AS commResult
+                 FROM t_elevator_control
+                 WHERE (DATE(ev_arrive_time) >= '${defaultStartDateCondition} ${startDate}' AND DATE(ev_arrive_time) <= '${defaultEndDateCondition} ${endDate}') 
+                       AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition})
+                       AND req_method ${defaultReqMethodCondition} ${reqMethodCondition} 
+                       AND comm_result ${defaultCommResultCondition} ${commResultConditCondition}
+                       AND direction ${defaultElvDirectionCondition} ${elvDirectionCondition}`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql);
     let resultList = data[0];
-
-    const sql2 =
-      "select count(*) as cnt from t_elevator_control where dong_code = ? and ho_code = ? and control_req_dtime >= ?";
-    const data2 = await pool.query(sql2, [dongCode, hoCode, startDate]);
-
-    let resultCnt = data2[0];
-
-    console.log("resultList : ", resultList);
-    // console.log("resultCnt[0].cnt : ", resultCnt[0].cnt);
-
+    console.log("resultList: " + resultList);
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
-      numOfRows,
-      pageNo,
-      totalCount: resultCnt[0].cnt + "",
-      doubleDataFlag,
       data: {
-        dongCode,
-        hoCode,
-        viewPeriod,
-        items: resultList,
+        resultList,
       },
     };
-
     return res.json(jsonResult);
-  } catch (err) {
-    return res.status(500).json(err);
+  } catch (error) {
+    return res.status(500).json(error);
   }
 });
 
