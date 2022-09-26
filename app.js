@@ -6,6 +6,7 @@ const parkingRouter = require("./routes/parkingRouter");
 const elecCarRouter = require("./routes/elecCarRouter");
 const pacelRouter = require("./routes/parcelRouter");
 const contractRouter = require("./routes/keyContractRouter");
+const applicationRouter = require("./routes/applicationRouter");
 
 const app = express();
 const port = 3000; // 서버 포트번호
@@ -19,6 +20,7 @@ app.use("/parking", parkingRouter);
 app.use("/elecCar", elecCarRouter);
 app.use("/parcel", pacelRouter);
 app.use("/contract", contractRouter);
+app.use("/application", applicationRouter);
 
 app.listen(port, () => {
   console.log(`서버가 실행됩니다. http://localhost:${port}`);
