@@ -17,7 +17,8 @@ router.get("/getKeyContract", async (req, res, next) => {
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, contact_flag AS contactFlag, facility_name AS facilityName, phone_num AS phoneNum,
                         DATE_FORMAT(insert_dtime, '%Y-%m-%d') AS insertDTime
                  FROM t_key_contact
-                 WHERE contact_flag ${defaultCondition} ${contactFlagCondition}`;
+                 WHERE contact_flag ${defaultCondition} ${contactFlagCondition}
+                 LIMIT 15`;
     console.log("sql: " + sql);
     const data = await pool.query(sql);
     let resultList = data[0];
@@ -55,6 +56,60 @@ router.post("/postKeyContract", async (req, res, next) => {
       memo,
     ]);
     console.log("data[0]=>" + data[0]);
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+// 주요 연락처 수정
+router.put("/updateKeyContract", async (req, res, next) => {
+  let {
+    idx = 0,
+    contactFlag = "",
+    facilityName = "",
+    phoneNum = "",
+    memo = "",
+  } = req.body;
+  console.log(idx, contactFlag, facilityName, phoneNum, memo);
+
+  try {
+    const sql = `UPDATE t_key_contact SET contact_flag = ?, facility_name = ?, phone_num = ?, memo = ? WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [
+      contactFlag,
+      facilityName,
+      phoneNum,
+      memo,
+      idx,
+    ]);
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+// 주요 연락처 삭제
+router.delete("/deleteKeyContract", async (req, res, next) => {
+  let { idx = 0 } = req.body;
+  console.log(idx);
+
+  try {
+    const sql = `DELETE FROM t_key_contact WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
 
     let jsonResult = {
       resultCode: "00",
