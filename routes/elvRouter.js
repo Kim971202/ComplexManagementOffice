@@ -9,7 +9,7 @@ let {
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
 
-//엘리베이터 이력 조회
+// 엘리베이터 이력 조회
 router.get("/getElevatorCallLog", async (req, res, next) => {
   let {
     startDate = "",
@@ -55,22 +55,18 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
     if (!endDate) {
       defaultEndDateCondition = "3000-01-01";
     }
-
     if (!!reqMethod) {
       reqMethodCondition = `= '${reqMethod}'`;
       defaultReqMethodCondition = "";
     }
-
     if (!!elvDirection) {
       elvDirectionCondition = `= '${elvDirection}'`;
       defaultElvDirectionCondition = "";
     }
-
     if (!!commResult) {
       commResultConditCondition = `= '${commResult}'`;
       defaultCommResultCondition = "";
     }
-
     if (!!dongCode) {
       dongCondition = `= '${dongCode}'`;
       defaultDongCondition = "";
@@ -99,6 +95,25 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
       data: {
         resultList,
       },
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+// 엘리베이터 이력 삭제
+router.delete("/deleteElevatorCallLog", async (req, res, next) => {
+  let { idx = 0 } = req.body;
+  console.log(idx);
+
+  try {
+    const sql = `DELETE FROM t_elevator_control WHERE idx = ?`;
+    console.log(sql);
+    const data = await pool.query(sql, [idx]);
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
     };
     return res.json(jsonResult);
   } catch (error) {
