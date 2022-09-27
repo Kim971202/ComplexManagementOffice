@@ -197,6 +197,25 @@ router.get("/getParkingIOList", async (req, res, next) => {
   }
 });
 
+// 입출차 정보 삭제
+router.delete("/deleteParkingIOList", async (req, res, next) => {
+  let { idx = 0 } = req.body;
+  console.log(idx);
+
+  try {
+    const sql = `DELETE FROM t_parking_io WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
 // 방문차량 목록 조회
 router.get("/getParkingResv", async (req, res, next) => {
   let {
