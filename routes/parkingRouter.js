@@ -173,7 +173,7 @@ router.get("/getParkingIOList", async (req, res, next) => {
       defaultCarNoCondition = "";
     }
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, inout_dtime AS inoutDtime, 
-                        inout_flag AS inoutFlag, dong_code AS dongCode, ho_code AS hoCode
+                        inout_flag AS inoutFlag, dong_code AS dongCode, ho_code AS hoCode,
                         car_no AS carNo, send_time AS sendTime, send_result AS sendResult
                  FROM t_parking_io
                  WHERE (DATE(inout_dtime) >= '${defaultStartDateCondition} ${startTime}' AND DATE(inout_dtime) <= '${defaultEndDateCondition} ${endTime}')
