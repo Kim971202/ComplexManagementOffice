@@ -225,6 +225,59 @@ router.delete("/deleteVoteAgenda", async (req, res, next) => {
   }
 });
 
-// 투표 마감 처리: 투표 종료처리 전단계
+// 오프라인 득표수 추가(투표 마감하기)
+router.post("/postOffVote", async (req, res, next) => {
+  let {
+    idx = 0,
+    itemNo = [],
+    voteNumberOff = 0
+  } = req.body;
+  console.log(idx, itemNo, voteNumberOff);
+
+  try {
+    
+    const sql = `UPDATE t_vote_items SET vote_number_off = ? WHERE idx = ? AND item_no = ?`;
+    console.log("sql: " + sql);
+    for (i = 0; i < itemNo.length; ++i) {
+      const data = await pool.query(sql, [voteNumberOff, idx, itemNo[i]]);
+    }
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+
+})
+
+// 투표 마감 취소
+router.post("/postCancelOffVote", async (req, res, next) => {
+  let {
+    idx = 0
+  } = req.body;
+  console.log(idx);
+
+  try {
+    const sql = `UPDATE t_vote_items SET vote_number_off = 0 WHERE idx = ?`
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error)
+  }
+})
+ 
+
+// 투표 마감
+router.post("/endVote", async (req, res, next) => {
+
+})
+
 
 module.exports = router;
