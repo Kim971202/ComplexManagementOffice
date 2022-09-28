@@ -23,7 +23,7 @@ router.get("/getContractList", async (req, res, next) => {
       defaultEndDateCondition = "3000-01-01";
     }
     if (!!contractTitle) {
-      contractTitleCondition = `= '${contractTitle}'`;
+      contractTitleCondition = `LIKE '${contractTitle}%'`;
       defaultContractTitleCondition = "";
     }
 
