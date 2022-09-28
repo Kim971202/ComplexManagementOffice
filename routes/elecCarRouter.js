@@ -3,23 +3,23 @@ const router = express.Router();
 const pool = require("../DB/dbPool");
 const xlsx = require("xlsx");
 
-const evchargingExcelSQL = `SELECT DATE_FORMAT(charge_start_dtime, '%Y-%m-%d-%h-%i-%s') as 시작일, dong_code as dongCode, ho_code as hoCode, charger_loc AS chargerLoc,
-                                  charger_type AS  chargerType,
-                                  charge_amount AS fillingAmount, use_fee AS chargeUseFee  
-                          FROM t_ev_charging_log`;
+// Excel 다운로드
+// const evchargingExcelSQL = `SELECT DATE_FORMAT(charge_start_dtime, '%Y-%m-%d-%h-%i-%s') as 시작일, dong_code as dongCode, ho_code as hoCode, charger_loc AS chargerLoc,
+//                                   charger_type AS  chargerType,
+//                                   charge_amount AS fillingAmount, use_fee AS chargeUseFee
+//                           FROM t_ev_charging_log`;
 
-const dowonloadDBToExcel = async () => {
-  const workbook = xlsx.utils.book_new();
-  const evcharging = await pool.query(evchargingExcelSQL);
-  //evcharging[0][0].idx;
-  const firstSheet = xlsx.utils.json_to_sheet(evcharging[0]);
-  xlsx.utils.book_append_sheet(workbook, firstSheet, "전기차 충전이력");
-  xlsx.writeFile(
-    workbook,
-    "C:UsersdsctDesktopCMOComplexManagementOfficemodulesexcelev.xlsx"
-  );
-};
-
+// const dowonloadDBToExcel = async () => {
+//   const workbook = xlsx.utils.book_new();
+//   const evcharging = await pool.query(evchargingExcelSQL);
+//   //evcharging[0][0].idx;
+//   const firstSheet = xlsx.utils.json_to_sheet(evcharging[0]);
+//   xlsx.utils.book_append_sheet(workbook, firstSheet, "전기차 충전이력");
+//   xlsx.writeFile(
+//     workbook,
+//     "C:UsersdsctDesktopCMOComplexManagementOfficemodulesexcelev.xlsx"
+//   );
+// };
 // dowonloadDBToExcel();
 
 let {
@@ -30,9 +30,7 @@ let {
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
 
-//TODO: excel 다운로드 추가
-
-//전기차충전 이력 리스트 조회
+// 전기차충전 이력 리스트 조회
 router.get("/getSearchedEVChargingLog", async (req, res, next) => {
   let {
     starTime = "",
@@ -45,7 +43,6 @@ router.get("/getSearchedEVChargingLog", async (req, res, next) => {
   console.log(starTime, endTime, chargerLoc, dongCode, hoCode);
 
   try {
-
     let defaultCondition = `Like '%'`;
     let defaultChargerLocCondition = defaultCondition;
     let defaultDongCondition = defaultCondition;
@@ -64,15 +61,15 @@ router.get("/getSearchedEVChargingLog", async (req, res, next) => {
     if (!endTime) {
       defaultEndTimeCondition = "3000-01-01";
     }
-    if(!!dongCode){
+    if (!!dongCode) {
       dongCondition = `= '${dongCode}'`;
       defaultDongCondition = "";
     }
-    if(!!hoCode){
+    if (!!hoCode) {
       hoCondition = `= '${hoCode}'`;
       defaultHoCondition = "";
     }
-    if(!!chargerLoc){
+    if (!!chargerLoc) {
       chargerLocCondition = `= '${chargerLoc}'`;
       defaultChargerLocCondition = "";
     }
@@ -103,10 +100,8 @@ router.get("/getSearchedEVChargingLog", async (req, res, next) => {
   } catch (error) {
     return res.status(500).json(error);
   }
-   
-   
 });
-//전기차충전 이력 리스트 상세조회
+// 전기차충전 이력 리스트 상세조회
 router.get("/getDeatiledEVChargingLog", async (req, res, next) => {
   let {
     serviceKey = "111111111", // 서비스 인증키
@@ -151,6 +146,26 @@ router.get("/getDeatiledEVChargingLog", async (req, res, next) => {
     return res.json(jsonResult);
   } catch (err) {
     return res.status(500).json(err);
+  }
+});
+// 전기차충전 이력 삭제
+router.delete("/deleteEVChargingLog", async (req, res, next) => {
+  let { idx = 0 } = req.body;
+  console.log(idx);
+
+  try {
+    const sql = `DELETE FROM t_ev_charging_log WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
   }
 });
 

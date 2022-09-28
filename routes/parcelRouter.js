@@ -42,7 +42,7 @@ router.get("/getParcelList", async (req, res, next) => {
     let defaultHoCondition = defaultCondition;
     let defaultParcelStatusCondition = defaultCondition;
     let defaultSendResultCondition = defaultCondition;
-    
+
     let dongCondition = "";
     let hoCondition = "";
     let parcelStatusCondition = "";
@@ -94,6 +94,8 @@ router.get("/getParcelList", async (req, res, next) => {
   }
 });
 
+// 택배 정보 등록
+// 경비실에서 받아서 직접 등록
 router.post("/postParcel", async (req, res, next) => {
   let {
     arrivalTime = "",
@@ -132,6 +134,56 @@ router.post("/postParcel", async (req, res, next) => {
       resultMsg: "NORMAL_SERVICE",
     };
 
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+// 택배 정보 수정
+// 수령여부 변경
+/**
+ * *택배구분
+  '무인' : 무인택배
+  '경비' : 경비실기
+  'PC' : 관리자 PC
+
+  *택배상태
+  0 : 미수령(택배도착)
+  1 : 수령
+  2 : 반품
+ * 
+ */
+router.put("/updateParcel", async (req, res, next) => {
+  let { idx = 0, parcelStatus = 0 } = req.body;
+  console.log(idx, parcelStatus);
+
+  try {
+    const sql = `UPDATE t_delivery SET parcel_status = ? WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [parcelStatus, idx]);
+    let resultList = data[0];
+    let jsonResult = {
+      resultList,
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+router.delete("/deleteParcel", async (req, res, next) => {
+  let { idx = 0 } = req.body;
+  console.log(idx);
+
+  try {
+    const sql = `DELETE FROM t_delivery WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let resultList = data[0];
+    let jsonResult = {
+      resultList,
+    };
     return res.json(jsonResult);
   } catch (error) {
     return res.status(500).json(error);
