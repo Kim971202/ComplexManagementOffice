@@ -227,15 +227,10 @@ router.delete("/deleteVoteAgenda", async (req, res, next) => {
 
 // 오프라인 득표수 추가(투표 마감하기)
 router.post("/postOffVote", async (req, res, next) => {
-  let {
-    idx = 0,
-    itemNo = [],
-    voteNumberOff = 0
-  } = req.body;
+  let { idx = 0, itemNo = [], voteNumberOff = 0 } = req.body;
   console.log(idx, itemNo, voteNumberOff);
 
   try {
-    
     const sql = `UPDATE t_vote_items SET vote_number_off = ? WHERE idx = ? AND item_no = ?`;
     console.log("sql: " + sql);
     for (i = 0; i < itemNo.length; ++i) {
@@ -249,18 +244,15 @@ router.post("/postOffVote", async (req, res, next) => {
   } catch (error) {
     return res.status(500).json(error);
   }
-
-})
+});
 
 // 투표 마감 취소
 router.post("/postCancelOffVote", async (req, res, next) => {
-  let {
-    idx = 0
-  } = req.body;
+  let { idx = 0 } = req.body;
   console.log(idx);
 
   try {
-    const sql = `UPDATE t_vote_items SET vote_number_off = 0 WHERE idx = ?`
+    const sql = `UPDATE t_vote_items SET vote_number_off = 0 WHERE idx = ?`;
     console.log("sql: " + sql);
     const data = await pool.query(sql, [idx]);
     let jsonResult = {
@@ -269,15 +261,60 @@ router.post("/postCancelOffVote", async (req, res, next) => {
     };
     return res.json(jsonResult);
   } catch (error) {
-    return res.status(500).json(error)
+    return res.status(500).json(error);
   }
-})
- 
+});
 
-// 투표 마감
-router.post("/endVote", async (req, res, next) => {
+// 투표 종료 처리
+router.post("/postEndVote", async (req, res, next) => {
+  let { idx = 0 } = req.body;
+  console.log(idx);
 
-})
+  try {
+    const sql = `UPDATE t_vote_agenda SET vote_end_flag = 'Y', fin_end_dtime = now() WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
 
+// 투표 결과 조회
+router.get("/getVoteResult", async (req, res, next) => {
+  let { idx = 0 } = req.query;
+  console.log(idx);
+
+  try {
+    const sql = `SELECT a.idx, a.vote_title AS voteTitle, vote_desc AS voteDesc,
+                        DATE_FORMAT(a.v_start_dtime, '%Y%m%d%h%i%s') AS vStartDate, 
+                        DATE_FORMAT(a.v_end_dtime, '%Y%m%d%h%i%s') AS vEndDate, 
+                        a.vote_end_flag AS voteResult, a.subjects_num AS subjectsNum,
+                        participation_num AS participationNum, CONCAT(ROUND((participation_num / subjects_num) * 100)) AS voteRate,
+                        b.item_no AS itemNo, item_content AS itemContent,  
+                        (b.votes_number + b.votes_number_off) AS votesNumber,
+                        CONCAT(ROUND((100*(b.votes_number + b.votes_number_off))/participation_num, 2), '%') AS getVotesRate
+                    FROM t_vote_agenda a INNER JOIN t_vote_items b
+                    ON a.idx = b.idx
+                    WHERE a.idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let resultList = data[0];
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      data: {
+        resultList,
+      },
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
 
 module.exports = router;
