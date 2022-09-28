@@ -225,4 +225,6 @@ router.delete("/deleteVoteAgenda", async (req, res, next) => {
   }
 });
 
+// 투표 마감 처리: 투표 종료처리 전단계
+
 module.exports = router;
