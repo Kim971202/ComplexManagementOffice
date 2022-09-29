@@ -88,4 +88,63 @@ router.get("/getDetailedEMS", async (req, res, next) => {
   }
 });
 
+// 에너지 관리 조회
+router.get("/getEMSManage", async (req, res, next) => {
+  let {
+    currentYear = "",
+    currentMonth = "",
+    selectedYear = "", // 년도 선택
+    selectedMonth = "", // 월 선택
+    energyType = "", // 에너지 유형
+    dongCode = "",
+    hoCode = "",
+  } = req.query;
+  console.log(selectedYear, selectedMonth, energyType);
+
+  try {
+    const tSQL = `SELECT DATE_FORMAT(now(), '%Y') AS currentYear, DATE_FORMAT(now(), '%m') AS currentMonth`;
+    const yearMonth = await pool.query(tSQL);
+    if (!selectedYear) currentYear = yearMonth[0][0].currentYear;
+    if (!selectedMonth) currentMonth = yearMonth[0][0].currentMonth;
+
+    let sql = "";
+
+    sql =
+      (selectedYear && selectedMonth) || (currentYear && currentMonth)
+        ? (sql += "CALL spMonthEnergyUseCall (?,?,?,?,?)")
+        : (sql += "CALL spYearEnergyUse (?, ?, ?, ?) ");
+
+    console.log("sql=>" + sql);
+    let data = "";
+    data =
+      selectedYear && selectedMonth
+        ? (data = await pool.query(sql, [
+            energyType,
+            selectedYear,
+            selectedMonth,
+            dongCode,
+            hoCode,
+          ]))
+        : (data = await pool.query(sql, [
+            energyType,
+            selectedYear,
+            dongCode,
+            hoCode,
+          ]));
+
+    let resultList = data[0][0];
+    console.log(resultList);
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      data: {
+        resultList,
+      },
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
 module.exports = router;
