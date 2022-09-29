@@ -43,7 +43,6 @@ router.get("/getDetailedNoticeList", async (req, res, next) => {
   }
 });
 
-// TODO: LIMIT 추가
 // 공지사항 목록조회
 router.get("/getNoticeList", async (req, res, next) => {
   let {
@@ -105,7 +104,8 @@ router.get("/getNoticeList", async (req, res, next) => {
                               AND (DATE(a.start_date) >= '${defaultStartDate} ${startDate}' AND (DATE(a.end_date) <= '${defaultEndDate} ${endDate}'))
                               AND a.noti_type ${defaultNotiTypeCondtion} ${notiTypeCondition}
                               AND b.send_result ${defaultSendResultCondition} ${sendResultCondition}
-                              AND a.noti_content ${defaultNotiContentCondtion} ${notiContentCondition}`;
+                              AND a.noti_content ${defaultNotiContentCondtion} ${notiContentCondition}
+                        LIMIT 15`;
 
     console.log("sql=>" + sql);
     const data = await pool.query(sql);

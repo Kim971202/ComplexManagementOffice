@@ -54,6 +54,7 @@ router.post("/postVoteAgenda", async (req, res, next) => {
     vStartDTime = "",
     vEndDTime = "",
     itemContents = [],
+    dongCode = "",
   } = req.body;
   console.log(voteTitle, voteDesc, vStartDTime, vEndDTime, itemContents);
 
@@ -61,16 +62,23 @@ router.post("/postVoteAgenda", async (req, res, next) => {
     let insertStartTime = vStartDTime + ":00:00";
     let insertEndTime = vEndDTime + ":00:00";
 
+    let countSQL = `SELECT ho_code AS hoCode, (SELECT COUNT(ho_code) AS hCount FROM t_dongho WHERE dong_code = ?) AS hCount 
+    FROM t_dongho WHERE dong_code = ?`;
+    console.log("countSQL: " + countSQL);
+    const countData = await pool.query(countSQL, [dongCode, dongCode]);
+    console.log(countData[0]);
+
     const sql = `INSERT INTO t_vote_agenda(vote_title, vote_desc, v_start_dtime, v_end_dtime, insert_date,
                                            user_code, vote_end_flag, subjects_num, participation_num,
                                            vote_rate)
-                 VALUES(?,?,?,?,now(),'tester', 'N', 0,0,0)`;
+                 VALUES(?,?,?,?,now(),'tester', 'N', 0, ?, 0)`;
     console.log("sql: " + sql);
     const data = await pool.query(sql, [
       voteTitle,
       voteDesc,
       insertStartTime,
       insertEndTime,
+      countData[0][0].hCount - 1,
     ]);
 
     let getIdxSQL = `SELECT idx as idx FROM t_vote_agenda ORDER BY idx DESC LIMIT 1`;

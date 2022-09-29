@@ -46,21 +46,21 @@ router.get("/getApplicationList", async (req, res, next) => {
     }
 
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, DATE_FORMAT(app_date, '%Y-%m-%d') AS appReceiptDate,
-                        app_method AS appMethod, DATE_FORMAT(app_complete_date, '%Y-%m-%d') AS appCompleteDate,
+                        app_method AS appMethod, IFNULL(DATE_FORMAT(app_complete_date, '%Y-%m-%d'), '-') AS appCompleteDate,
                         progress_status AS progressStatus
                  FROM t_application_complaint
-                 WHERE (DATE(app_receipt_date) >= '${defaultStartDateCondition} ${startTime}' AND DATE(app_receipt_date) <= '${defaultEndDateCondition} ${endTime}')
+                 WHERE (DATE(app_date) >= '${defaultStartDateCondition} ${startDate}' AND DATE(app_date) <= '${defaultEndDateCondition} ${endDate}')
                        AND (dong_code ${defaultDongCodeCondition} ${dongCodeCondition} AND ho_code ${defaultHoCodeCondition} ${hoCodeCondition})
-                       AND app_date ${defaultAppReceiptDateCondition} ${appReceiptDate}`;
+                       AND app_date ${defaultAppReceiptDateCondition} ${appReceiptDateCondition}`;
     console.log("sql: " + sql);
-
+    const data = await pool.query(sql);
     let resultList = data[0];
 
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
       data: {
-        items: resultList,
+        resultList,
       },
     };
     return res.json(jsonResult);
@@ -86,9 +86,16 @@ router.put("/updateComplaint", async (req, res, next) => {
   console.log(idx, progressStatus);
 
   try {
-    const sql = `UPDATE t_application_complaint SET progress_status = ? WHERE idx = ?`;
-    console.log("sql: " + sql);
+    let sql = "";
 
+    sql =
+      progressStatus == 0
+        ? (sql += `UPDATE t_application_complaint SET progress_status = ?, app_cancel_date = now() WHERE idx = ?`)
+        : progressStatus == 2
+        ? (sql += `UPDATE t_application_complaint SET progress_status = ?, app_receipt_date = now() WHERE idx = ?`)
+        : (sql += `UPDATE t_application_complaint SET progress_status = ?, app_complete_date = now() WHERE idx = ?`);
+
+    console.log("sql: " + sql);
     const data = await pool.query(sql, [progressStatus, idx]);
     console.log(data[0]);
     let jsonResult = {
