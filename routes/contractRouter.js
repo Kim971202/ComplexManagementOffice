@@ -1,11 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
+const { upload } = require("../modules/fileUpload");
+const { getServerIp } = require("../modules/ipSearch");
 
-const multer = require("multer");
-const upload = multer({
-  dest: __dirname + "/uploads/", // 이미지 업로드 경로
-});
 // 계약 자료 조회
 router.get("/getContractList", async (req, res, next) => {
   let { startDate = "", endDate = "", contractTitle = "" } = req.query;
@@ -102,39 +100,41 @@ router.post("/updateContract", async (req, res, next) => {
 });
 
 // 계약 자료 등록
-router.post("/uploadContract", upload.single("file"), (req, res, next) => {
-  const {
-    fieldname,
-    originalname,
-    encoding,
-    mimetype,
-    destination,
-    filename,
-    path,
-    size,
-  } = req.file;
-  const { name } = req.body;
-  // 파일 경로 및 이름 설정 옵션
-  const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, "/tmp/my-uploads"); // 파일 업로드 경로
-    },
-    filename: function (req, file, cb) {
-      cb(null, file.fieldname + "-" + Date.now()); //파일 이름 설정
-    },
-  });
-  const upload = multer({ storage: storage });
-  console.log("body 데이터 : ", name);
-  console.log("폼에 정의된 필드명 : ", fieldname);
-  console.log("사용자가 업로드한 파일 명 : ", originalname);
-  console.log("파일의 엔코딩 타입 : ", encoding);
-  console.log("파일의 Mime 타입 : ", mimetype);
-  console.log("파일이 저장된 폴더 : ", destination);
-  console.log("destinatin에 저장된 파일 명 : ", filename);
-  console.log("업로드된 파일의 전체 경로 ", path);
-  console.log("파일의 바이트(byte 사이즈)", size);
-
-  res.json({ ok: true, data: "Single Upload Ok" });
-});
+router.post(
+  "/uploadContract",
+  upload.single("file"),
+  async (req, res, next) => {
+    let {
+      contractDate = "",
+      contractTitle = "",
+      contractContent = "",
+      userID = "",
+    } = req.body;
+    let fileName = req.file.originalname;
+    let filePath =
+      `http://${getServerIp()}:3000/` + req.file.destination + fileName;
+    console.log(contractDate, contractTitle, contractContent, userID);
+    try {
+      const sql = `INSERT INTO t_contract_document(contract_date, contract_title, contract_content, file_path, insert_dtime, user_id, file_name)
+                   VALUES(DATE_FORMAT(?,"%y-%m-%d"),?,?,?,now(),?,?)`;
+      console.log("sql: " + sql);
+      const data = await pool.query(sql, [
+        contractDate,
+        contractTitle,
+        contractContent,
+        filePath,
+        userID,
+        fileName,
+      ]);
+      let jsonResult = {
+        resultCode: "00",
+        resultMsg: "NORMAL_SERVICE",
+      };
+      return res.json(jsonResult);
+    } catch (error) {
+      return res.status(500).json(error);
+    }
+  }
+);
 
 module.exports = router;

@@ -30,6 +30,9 @@ app.use("/mng", mngFeeRouter);
 app.use("/vote", voteRouter);
 app.use("/ems", emsRouter);
 
+// PDF 파일
+app.use("/public/contract", express.static("public/contract/"));
+
 app.listen(port, () => {
   console.log(`서버가 실행됩니다. http://localhost:${port}`);
 });
