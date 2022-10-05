@@ -3,10 +3,14 @@ const router = express.Router();
 const pool = require("../DB/dbPool");
 const { upload, checkUploadType } = require("../modules/fileUpload");
 const { getServerIp } = require("../modules/ipSearch");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 공지사항 목록조회
 router.get("/getNoticeList", async (req, res, next) => {
   let {
+    serviceKey = "111111111", // 서비스 인증키
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1, //               페이지 번호
     startDate = "",
     endDate = "",
     notiType = "",
@@ -14,8 +18,22 @@ router.get("/getNoticeList", async (req, res, next) => {
     notiContent = "",
   } = req.query;
 
-  console.log(startDate, endDate, notiType, sendResult, notiContent);
-
+  console.log(
+    serviceKey,
+    numOfRows,
+    pageNo,
+    startDate,
+    endDate,
+    notiType,
+    sendResult,
+    notiContent
+  );
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
     let defaultNotiTypeCondtion = defaultCondition;
@@ -44,9 +62,12 @@ router.get("/getNoticeList", async (req, res, next) => {
       defaultSendResultCondition = "";
     }
     if (!!notiContent) {
-      notiContentCondition = `= ${notiContent}`;
+      notiContentCondition = `LIKE '${notiContent}%'`;
       defaultNotiContentCondtion = "";
     }
+
+    let sRow = (pageNo - 1) * numOfRows;
+    let size = numOfRows * 1;
 
     const sql3 = `UPDATE t_notice a
                     INNER JOIN t_notice_send b
@@ -66,17 +87,29 @@ router.get("/getNoticeList", async (req, res, next) => {
                               AND a.noti_type ${defaultNotiTypeCondtion} ${notiTypeCondition}
                               AND b.send_result ${defaultSendResultCondition} ${sendResultCondition}
                               AND a.noti_content ${defaultNotiContentCondtion} ${notiContentCondition}
-                        LIMIT 15`;
+                        LIMIT ?,?`;
 
     console.log("sql=>" + sql);
-    const data = await pool.query(sql);
+    const data = await pool.query(sql, [Number(sRow), Number(size)]);
     let resultList = data[0];
+
+    const sql2 = `SELECT count(idx) as cnt
+                  FROM t_notice
+                  WHERE  
+                        (DATE(start_date) >= '${defaultStartDate} ${startDate}' AND (DATE(end_date) <= '${defaultEndDate} ${endDate}'))
+                        AND noti_type ${defaultNotiTypeCondtion} ${notiTypeCondition}
+                        AND noti_content ${defaultNotiContentCondtion} ${notiContentCondition}`;
+    const data2 = await pool.query(sql2);
+    let resultCnt = data2[0];
 
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
       data: {
-        resultList,
+        items: resultList,
       },
     };
     console.log(resultList);
@@ -88,8 +121,14 @@ router.get("/getNoticeList", async (req, res, next) => {
 
 // 공지사항 상세보기
 router.get("/getDetailedNoticeList", async (req, res, next) => {
-  let { idx = "" } = req.body;
-  console.log(idx);
+  let { serviceKey = "", idx = "" } = req.query;
+  console.log(serviceKey, idx);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const updateSQL = `UPDATE t_notice_send SET send_result = 'Y' WHERE idx = ?`;
     const updateSQLData = await pool.query(updateSQL, [idx]);
@@ -101,16 +140,9 @@ router.get("/getDetailedNoticeList", async (req, res, next) => {
                         b.send_result AS sendResult, a.noti_type AS notiType
                  FROM t_notice a
                  INNER JOIN t_notice_send b
-                 WHERE a.idx = b.idx AND a.idx = ?`;
+                 WHERE a.idx = b.idx AND a.idx = ? 
+                 LIMIT 1`;
     const data = await pool.query(sql, [idx]);
-    let test = data[0];
-    console.log(typeof test[0].endDate);
-    console.log(test[0].endDate.length);
-
-    let myTime = new Date();
-    let mySeconds = myTime.getSeconds();
-    console.log(typeof mySeconds.length);
-    // if(mySeconds.length)
     console.log("sql: " + sql);
     let resultList = data[0];
     let jsonResult = {
@@ -130,6 +162,7 @@ router.get("/getDetailedNoticeList", async (req, res, next) => {
 // 공지사항 등록 (개별, 전체)
 router.post("/postNotice", upload.single("file"), async (req, res, next) => {
   let {
+    serviceKey = "111111111", // 서비스 인증키
     dongCode = "", //     동코드
     hoCode = "", //       호코드
     notiType = "", //     공지 타입
@@ -140,6 +173,7 @@ router.post("/postNotice", upload.single("file"), async (req, res, next) => {
     notiOwer = "", //     공지 주체
   } = req.body;
   console.log(
+    serviceKey,
     dongCode,
     hoCode,
     notiType,
@@ -149,7 +183,12 @@ router.post("/postNotice", upload.single("file"), async (req, res, next) => {
     endDate,
     notiOwer
   );
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   checkUploadType(2);
 
   let fileName = req.file.originalname;
@@ -213,9 +252,15 @@ router.post("/postNotice", upload.single("file"), async (req, res, next) => {
 
 // 공지사항 수정
 router.put("/updateNotice", upload.single("file"), async (req, res, next) => {
-  let { idx = 0, notiTitle = "", notiContent = "" } = req.body;
-  console.log(idx, notiTitle, notiContent);
+  let { serviceKey = "", idx = 0, notiTitle = "", notiContent = "" } = req.body;
+  console.log(serviceKey, idx, notiTitle, notiContent);
   checkUploadType(2);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     // 월패드 알림이 Y 이면 수정 불가
     const checkNotiTypeSQL = `SELECT send_result AS sendResult FROM t_notice_send WHERE idx = ?`;
@@ -267,9 +312,14 @@ router.put("/updateNotice", upload.single("file"), async (req, res, next) => {
 
 // 공지사항 삭제
 router.delete("/deleteNotice", async (req, res) => {
-  let { idx = 0 } = req.body;
+  let { serviceKey = "", idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     // 월패드 알림이 Y 이면 삭제 불가
     const checkNotiTypeSQL = `SELECT send_result AS sendResult FROM t_notice_send WHERE idx = ?`;

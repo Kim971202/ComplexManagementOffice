@@ -1,11 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 에너지 조회
 router.get("/getEMS", async (req, res, next) => {
-  let { startDate = "", endDate = "", dongCode = "", hoCode = "" } = req.query;
-  console.log(startDate, endDate, dongCode, hoCode);
+  let {
+    serviceKey = "",
+    startDate = "",
+    endDate = "",
+    dongCode = "",
+    hoCode = "",
+  } = req.query;
+  console.log(serviceKey, startDate, endDate, dongCode, hoCode);
 
   try {
     let = defaultCondition = `LIKE '%'`;
@@ -49,7 +56,7 @@ router.get("/getEMS", async (req, res, next) => {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
       data: {
-        resultList,
+        items: resultList,
       },
     };
     return res.json(jsonResult);
@@ -60,9 +67,20 @@ router.get("/getEMS", async (req, res, next) => {
 
 // 에너지 상세 조회
 router.get("/getDetailedEMS", async (req, res, next) => {
-  let { startDate = "", endDate = "", dongCode = "", hoCode = "" } = req.query;
-  console.log(startDate, endDate, dongCode, hoCode);
-
+  let {
+    serviceKey = "",
+    startDate = "",
+    endDate = "",
+    dongCode = "",
+    hoCode = "",
+  } = req.query;
+  console.log(serviceKey, startDate, endDate, dongCode, hoCode);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY energy_dtime) AS No,  DATE_FORMAT(energy_dtime, '%Y-%m-%d') AS date,
                             CONCAT('meter: ', elec_meter, ' usage: ', elec_usage) AS elec,
@@ -100,7 +118,12 @@ router.get("/getEMSManage", async (req, res, next) => {
     hoCode = "",
   } = req.query;
   console.log(selectedYear, selectedMonth, energyType);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const tSQL = `SELECT DATE_FORMAT(now(), '%Y') AS currentYear, DATE_FORMAT(now(), '%m') AS currentMonth`;
     const yearMonth = await pool.query(tSQL);

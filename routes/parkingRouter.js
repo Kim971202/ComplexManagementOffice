@@ -10,6 +10,7 @@ let {
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
 const { getVariables } = require("../modules/validationCheck");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 주차위치 정보 조회
 router.get("/getParkingLocationList", async (req, res, next) => {
@@ -34,6 +35,12 @@ router.get("/getParkingLocationList", async (req, res, next) => {
     endDate,
     tagName
   );
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
     let defaultStartDateCondition = "";
@@ -116,6 +123,12 @@ router.get("/getDetailedParkingLocationList", async (req, res, next) => {
   const data = await pool.query(parkingDeatiledSQL, [idx]);
   let resultList = data[0];
   console.log(resultList);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     {
       let jsonResult = {
@@ -136,7 +149,12 @@ router.get("/getDetailedParkingLocationList", async (req, res, next) => {
 router.delete("/deleteParkingLocationList", async (req, res, next) => {
   let { serviceKey = "", idx = 0 } = req.body;
   console.log(serviceKey, idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `DELETE FROM t_parking_loc WHERE idx = ?`;
     console.log("sql: " + sql);

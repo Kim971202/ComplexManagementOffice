@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 입출차 정보 조회
 router.get("/getParkingIOList", async (req, res, next) => {
@@ -26,7 +27,12 @@ router.get("/getParkingIOList", async (req, res, next) => {
     sendResult,
     carNo
   );
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
     let defaultStartDateCondition = "";
@@ -67,14 +73,15 @@ router.get("/getParkingIOList", async (req, res, next) => {
     let sRow = (pageNo - 1) * numOfRows;
     let size = numOfRows * 1;
 
-    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, inout_dtime AS inoutDtime, 
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No,  DATE_FORMAT(inout_dtime, '%Y-%m-%d %h:%i:%s') AS inoutDtime, 
                           inout_flag AS inoutFlag, dong_code AS dongCode, ho_code AS hoCode,
-                          car_no AS carNo, send_time AS sendTime, send_result AS sendResult
+                          car_no AS carNo, DATE_FORMAT(send_time, '%Y-%m-%d %h:%i:%s') AS sendTime, send_result AS sendResult
                    FROM t_parking_io
                    WHERE (DATE(inout_dtime) >= '${defaultStartDateCondition} ${startDate}' AND DATE(inout_dtime) <= '${defaultEndDateCondition} ${endDate}')
                          AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition})
                          AND send_result ${defaultSendResultCondition} ${sendResultCondition}
-                         AND car_no ${defaultCarNoCondition} ${carNoCondition}`;
+                         AND car_no ${defaultCarNoCondition} ${carNoCondition}
+                         LIMIT ?,?`;
     const data = await pool.query(sql, [Number(sRow), Number(size)]);
     console.log("sql: " + sql);
     let resultList = data[0];
@@ -106,9 +113,14 @@ router.get("/getParkingIOList", async (req, res, next) => {
 
 // 입출차 정보 삭제
 router.delete("/deleteParkingIOList", async (req, res, next) => {
-  let { idx = 0 } = req.body;
-  console.log(idx);
-
+  let { serviceKey = "", idx = 0 } = req.body;
+  console.log(serviceKey, idx);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `DELETE FROM t_parking_io WHERE idx = ?`;
     console.log("sql: " + sql);

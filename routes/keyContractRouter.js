@@ -1,12 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 주요 연락처 조회
 router.get("/getKeyContract", async (req, res, next) => {
   let { contactFlag = "" } = req.query;
   console.log(contactFlag);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
     let contactFlagCondition = "";
@@ -45,7 +51,12 @@ router.post("/postKeyContract", async (req, res, next) => {
     memo = "",
   } = req.query;
   console.log(contactFlag, facilityName, phoneNum, memo);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `INSERT INTO t_key_contact(phone_num, contact_flag, facility_name, memo, insert_dtime)
                  VALUES(?,?,?,?,now())`;
@@ -78,7 +89,12 @@ router.put("/updateKeyContract", async (req, res, next) => {
     memo = "",
   } = req.body;
   console.log(idx, contactFlag, facilityName, phoneNum, memo);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `UPDATE t_key_contact SET contact_flag = ?, facility_name = ?, phone_num = ?, memo = ? WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -105,7 +121,12 @@ router.put("/updateKeyContract", async (req, res, next) => {
 router.delete("/deleteKeyContract", async (req, res, next) => {
   let { idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `DELETE FROM t_key_contact WHERE idx = ?`;
     console.log("sql: " + sql);

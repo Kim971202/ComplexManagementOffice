@@ -7,12 +7,26 @@ const {
   deleteFile,
 } = require("../modules/fileUpload");
 const { getServerIp } = require("../modules/ipSearch");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 계약 자료 조회
 router.get("/getContractList", async (req, res, next) => {
-  let { startDate = "", endDate = "", contractTitle = "" } = req.query;
-  console.log(startDate, endDate, contractTitle);
+  let {
+    serviceKey = "111111111", // 서비스 인증키
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1,
+    startDate = "",
+    endDate = "",
+    contractTitle = "",
+  } = req.query;
+  console.log(serviceKey, numOfRows, pageNo, startDate, endDate, contractTitle);
 
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
     let defaultContractTitleCondition = defaultCondition;
@@ -33,17 +47,37 @@ router.get("/getContractList", async (req, res, next) => {
       defaultContractTitleCondition = "";
     }
 
+    let sRow = (pageNo - 1) * numOfRows;
+    let size = numOfRows * 1;
+
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, contract_title AS contractTitle, 
                         DATE_FORMAT(contract_date, '%Y-%m-%d') AS contractDate
                  FROM t_contract_document
                  WHERE (DATE(contract_date) >= '${defaultStartDateCondition} ${startDate}' AND DATE(contract_date) <= '${defaultEndDateCondition} ${endDate}') 
-                       AND contract_title ${defaultContractTitleCondition} ${contractTitleCondition}`;
+                       AND contract_title ${defaultContractTitleCondition} ${contractTitleCondition}
+                       LIMIT ?,?`;
     console.log("sql: " + sql);
-    const data = await pool.query(sql);
+    const data = await pool.query(sql, [Number(sRow), Number(size)]);
+
+    const sql2 = `SELECT count(idx) as cnt
+                  FROM t_contract_document
+                  WHERE (DATE(contract_date) >= '${defaultStartDateCondition} ${startDate}' AND DATE(contract_date) <= '${defaultEndDateCondition} ${endDate}') 
+                       AND contract_title ${defaultContractTitleCondition} ${contractTitleCondition}`;
+    const data2 = await pool.query(sql2);
+    let resultCnt = data2[0];
+
     let resultList = data[0];
     let jsonResult = {
-      resultList,
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
+      data: {
+        items: resultList,
+      },
     };
+    console.log(resultList);
     return res.json(jsonResult);
   } catch (error) {
     return res.status(500).json(error);
@@ -52,9 +86,14 @@ router.get("/getContractList", async (req, res, next) => {
 
 // 계약 자료 상세 조회
 router.get("/getDetailedContractList", async (req, res, next) => {
-  let { idx = 0 } = req.query;
-  console.log(idx);
-
+  let { serviceKey = "", idx = 0 } = req.query;
+  console.log(serviceKey, idx);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `SELECT DATE_FORMAT(contract_date, '%Y-%m-%d %h:%i:%s') AS contractDate, contract_title AS contractTitle, contract_content AS contractContent, 
                         file_path AS filePath, file_name AS fileName
@@ -66,9 +105,7 @@ router.get("/getDetailedContractList", async (req, res, next) => {
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
-      data: {
-        resultList,
-      },
+      data: resultList,
     };
     return res.json(jsonResult);
   } catch (error) {
@@ -82,13 +119,20 @@ router.post(
   upload.single("file"),
   async (req, res, next) => {
     let {
+      serviceKey = "",
       idx = 0,
       contractDate = "",
       contractTitle = "",
       contractContent = "",
     } = req.body;
-    console.log(idx, contractDate, contractTitle, contractContent);
+    console.log(serviceKey, idx, contractDate, contractTitle, contractContent);
     checkUploadType(3);
+    if ((await checkServiceKeyResult(serviceKey)) == false) {
+      return res.json({
+        resultCode: "30",
+        resultMsg: "등록되지 않은 서비스키 입니다.",
+      });
+    }
     try {
       const oSQL = `SELECT contract_title AS contracTitle, contract_content AS contractContent, file_name AS fileName FROM t_contract_document
                     WHERE idx = ?`;
@@ -146,12 +190,25 @@ router.post(
   upload.single("file"),
   async (req, res, next) => {
     let {
+      serviceKey = "",
       contractDate = "",
       contractTitle = "",
       contractContent = "",
       userID = "",
     } = req.body;
-    console.log(contractDate, contractTitle, contractContent, userID);
+    console.log(
+      serviceKey,
+      contractDate,
+      contractTitle,
+      contractContent,
+      userID
+    );
+    if ((await checkServiceKeyResult(serviceKey)) == false) {
+      return res.json({
+        resultCode: "30",
+        resultMsg: "등록되지 않은 서비스키 입니다.",
+      });
+    }
     checkUploadType(3);
     let fileName = req.file.originalname;
     let filePath =
@@ -179,5 +236,28 @@ router.post(
     }
   }
 );
+
+router.delete("/deleteContract", async (req, res, next) => {
+  let { serviceKey = "", idx = 0 } = req.body;
+  console.log(serviceKey, idx);
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
+  try {
+    const sql = `DELETE FROM t_contract_document WHERE idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
 
 module.exports = router;

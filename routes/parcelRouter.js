@@ -8,6 +8,7 @@ let {
   strDateFormat,
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 택배 정보 조회
 router.get("/getParcelList", async (req, res, next) => {
@@ -44,7 +45,12 @@ router.get("/getParcelList", async (req, res, next) => {
   else if (parcelStatus === "RETURN") parcelStatus_ = "1";
   else if (parcelStatus === "RECEIPT") parcelStatus_ = "2";
   console.log("parcelStatus_=>" + parcelStatus_);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
     let defaultDongCondition = defaultCondition;
@@ -129,7 +135,12 @@ router.post("/postParcel", async (req, res, next) => {
     hoCode = "",
     parcelCorp = "",
   } = req.body;
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   console.log(parcelStatus, dongCode, hoCode, parcelCorp);
   try {
     parcelBoxNo = "00" + 1;
@@ -181,7 +192,12 @@ router.post("/postParcel", async (req, res, next) => {
 router.put("/updateParcel", async (req, res, next) => {
   let { serviceKey = "", idx = 0, parcelStatus = 0 } = req.body;
   console.log(serviceKey, idx, parcelStatus);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `UPDATE t_delivery SET parcel_status = ?, receive_time = now() WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -200,7 +216,12 @@ router.put("/updateParcel", async (req, res, next) => {
 router.delete("/deleteParcel", async (req, res, next) => {
   let { serviceKey = "", idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `DELETE FROM t_delivery WHERE idx = ?`;
     console.log("sql: " + sql);

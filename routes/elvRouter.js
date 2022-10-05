@@ -8,6 +8,7 @@ let {
   strDateFormat,
   getDateOfMonthByFlag,
 } = require("../modules/dataFunction");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 엘리베이터 이력 조회
 router.get("/getElevatorCallLog", async (req, res, next) => {
@@ -36,7 +37,12 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
     dongCode,
     hoCode
   );
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `LIKE '%'`;
 
@@ -134,7 +140,12 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
 router.delete("/deleteElevatorCallLog", async (req, res, next) => {
   let { serviceKey = "", idx = 0 } = req.body;
   console.log(serviceKey, idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `DELETE FROM t_elevator_control WHERE idx = ?`;
     console.log(sql);

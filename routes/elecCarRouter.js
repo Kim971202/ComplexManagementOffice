@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
 const xlsx = require("xlsx");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // Excel 다운로드
 // const evchargingExcelSQL = `SELECT DATE_FORMAT(charge_start_dtime, '%Y-%m-%d-%h-%i-%s') as 시작일, dong_code as dongCode, ho_code as hoCode, charger_loc AS chargerLoc,
@@ -53,7 +54,12 @@ router.get("/getEVChargingLog", async (req, res, next) => {
     dongCode,
     hoCode
   );
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultCondition = `Like '%'`;
     let defaultChargerLocCondition = defaultCondition;
@@ -139,7 +145,12 @@ router.get("/getDeatiledEVChargingLog", async (req, res, next) => {
   } = req.query;
 
   console.log(serviceKey, idx, dongCode, hoCode);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let sRow = (pageNo - 1) * numOfRows;
     let size = numOfRows * (doubleDataFlag === "Y" ? 2 : 1);
@@ -179,7 +190,12 @@ router.get("/getDeatiledEVChargingLog", async (req, res, next) => {
 router.delete("/deleteEVChargingLog", async (req, res, next) => {
   let { idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `DELETE FROM t_ev_charging_log WHERE idx = ?`;
     console.log("sql: " + sql);

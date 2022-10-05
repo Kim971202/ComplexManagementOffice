@@ -1,12 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
+const checkServiceKeyResult = require("../modules/authentication");
 
 // 투표 목록 조회
 router.get("/getVoteAgenda", async (req, res, next) => {
   let { startDate = "", endDate = "", voteEndFlag = "" } = req.query;
   console.log(startDate, endDate, voteEndFlag);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let defaultValue = `LIKE '%'`;
     let defaultVoteEndFlag = defaultValue;
@@ -57,7 +63,12 @@ router.post("/postVoteAgenda", async (req, res, next) => {
     dongCode = "",
   } = req.body;
   console.log(voteTitle, voteDesc, vStartDTime, vEndDTime, itemContents);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     let insertStartTime = vStartDTime + ":00:00";
     let insertEndTime = vEndDTime + ":00:00";
@@ -127,7 +138,12 @@ router.put("/updateVoteAgenda", async (req, res, next) => {
     itemContents,
     itemNo
   );
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `SELECT DATE_FORMAT(v_start_dtime, '%Y-%m-%d %h') AS vsDtime FROM t_vote_agenda WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -201,7 +217,12 @@ router.put("/updateVoteAgenda", async (req, res, next) => {
 router.delete("/deleteVoteAgenda", async (req, res, next) => {
   let { idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `SELECT DATE_FORMAT(v_start_dtime, '%Y-%m-%d %h') AS vsDtime FROM t_vote_agenda WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -238,7 +259,12 @@ router.delete("/deleteVoteAgenda", async (req, res, next) => {
 router.post("/postOffVote", async (req, res, next) => {
   let { idx = 0, itemNo = [], voteNumberOff = 0 } = req.body;
   console.log(idx, itemNo, voteNumberOff);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `UPDATE t_vote_items SET vote_number_off = ? WHERE idx = ? AND item_no = ?`;
     console.log("sql: " + sql);
@@ -259,7 +285,12 @@ router.post("/postOffVote", async (req, res, next) => {
 router.post("/postCancelOffVote", async (req, res, next) => {
   let { idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `UPDATE t_vote_items SET vote_number_off = 0 WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -278,7 +309,12 @@ router.post("/postCancelOffVote", async (req, res, next) => {
 router.post("/postEndVote", async (req, res, next) => {
   let { idx = 0 } = req.body;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `UPDATE t_vote_agenda SET vote_end_flag = 'Y', fin_end_dtime = now() WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -297,7 +333,12 @@ router.post("/postEndVote", async (req, res, next) => {
 router.get("/getVoteResult", async (req, res, next) => {
   let { idx = 0 } = req.query;
   console.log(idx);
-
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
   try {
     const sql = `SELECT a.idx, a.vote_title AS voteTitle, vote_desc AS voteDesc,
                         DATE_FORMAT(a.v_start_dtime, '%Y%m%d%h%i%s') AS vStartDate, 
