@@ -12,6 +12,9 @@ let {
 // 엘리베이터 이력 조회
 router.get("/getElevatorCallLog", async (req, res, next) => {
   let {
+    serviceKey = "111111111", // 서비스 인증키
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1, //               페이지 번호
     startDate = "",
     endDate = "",
     reqMethod = "",
@@ -22,6 +25,9 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
   } = req.query;
 
   console.log(
+    serviceKey,
+    numOfRows,
+    pageNo,
     startDate,
     endDate,
     reqMethod,
@@ -76,24 +82,46 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
       defaultHoCondition = "";
     }
 
-    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, DATE_FORMAT(control_req_dtime, '%Y-%m-%d %h:%i:%s') AS controlReqDTime, req_method AS reqMethod,
-                        direction, dong_code AS dong_code, ho_code AS hoCode, DATE_FORMAT(comm_dtime, '%h:%i:%s') AS commDTime,
-                        comm_result AS commResult
+    let sRow = (pageNo - 1) * numOfRows;
+    let size = numOfRows * 1;
+
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, DATE_FORMAT(control_req_dtime, '%Y-%m-%d %h:%i:%s') AS controlReqDTime, 
+                        (CASE WHEN req_method = 'W' THEN '월패드'
+                              WHEN req_method = 'S' THEN '스마트폰' ELSE '-' END) as  resvMethod,
+                        (CASE WHEN direction = 'U' THEN '상향'
+                              WHEN direction = 'D' THEN '하향' ELSE '-' END) AS direction, 
+                        dong_code AS dongCode, ho_code AS hoCode, DATE_FORMAT(comm_dtime, '%h:%i:%s') AS commDTime,
+                        (CASE WHEN comm_result = 'Y' THEN '성공'
+                              WHEN comm_result = 'N' THEN '실패' ELSE '-' END) AS commResult
                  FROM t_elevator_control
                  WHERE (DATE(ev_arrive_time) >= '${defaultStartDateCondition} ${startDate}' AND DATE(ev_arrive_time) <= '${defaultEndDateCondition} ${endDate}') 
                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition})
                        AND req_method ${defaultReqMethodCondition} ${reqMethodCondition} 
                        AND comm_result ${defaultCommResultCondition} ${commResultConditCondition}
-                       AND direction ${defaultElvDirectionCondition} ${elvDirectionCondition}`;
+                       AND direction ${defaultElvDirectionCondition} ${elvDirectionCondition}
+                       LIMIT ?,?`;
     console.log("sql: " + sql);
-    const data = await pool.query(sql);
+    const data = await pool.query(sql, [Number(sRow), Number(size)]);
     let resultList = data[0];
-    console.log("resultList: " + resultList);
+
+    const sql2 = `SELECT count(idx) as cnt
+                  FROM t_elevator_control
+                  WHERE (DATE(ev_arrive_time) >= '${defaultStartDateCondition} ${startDate}' AND DATE(ev_arrive_time) <= '${defaultEndDateCondition} ${endDate}') 
+                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition})
+                        AND req_method ${defaultReqMethodCondition} ${reqMethodCondition} 
+                        AND comm_result ${defaultCommResultCondition} ${commResultConditCondition}
+                        AND direction ${defaultElvDirectionCondition} ${elvDirectionCondition}`;
+    const data2 = await pool.query(sql2);
+    let resultCnt = data2[0];
+
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
       data: {
-        resultList,
+        items: resultList,
       },
     };
     return res.json(jsonResult);
@@ -104,8 +132,8 @@ router.get("/getElevatorCallLog", async (req, res, next) => {
 
 // 엘리베이터 이력 삭제
 router.delete("/deleteElevatorCallLog", async (req, res, next) => {
-  let { idx = 0 } = req.body;
-  console.log(idx);
+  let { serviceKey = "", idx = 0 } = req.body;
+  console.log(serviceKey, idx);
 
   try {
     const sql = `DELETE FROM t_elevator_control WHERE idx = ?`;

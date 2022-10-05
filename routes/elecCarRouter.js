@@ -31,16 +31,28 @@ let {
 } = require("../modules/dataFunction");
 
 // 전기차충전 이력 리스트 조회
-router.get("/getSearchedEVChargingLog", async (req, res, next) => {
+router.get("/getEVChargingLog", async (req, res, next) => {
   let {
-    starTime = "",
-    endTime = "",
+    serviceKey = "111111111", // 서비스 인증키
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1, //               페이지 번호
+    startDate = "",
+    endDate = "",
     chargerLoc = "",
     dongCode = "", //        동코드
     hoCode = "", //          호코드
   } = req.query;
 
-  console.log(starTime, endTime, chargerLoc, dongCode, hoCode);
+  console.log(
+    serviceKey,
+    numOfRows,
+    pageNo,
+    startDate,
+    endDate,
+    chargerLoc,
+    dongCode,
+    hoCode
+  );
 
   try {
     let defaultCondition = `Like '%'`;
@@ -55,10 +67,10 @@ router.get("/getSearchedEVChargingLog", async (req, res, next) => {
     let hoCondition = "";
     let chargerLocCondition = "";
 
-    if (!starTime) {
+    if (!startDate) {
       defaultStartTimeCondition = "1900-01-01";
     }
-    if (!endTime) {
+    if (!endDate) {
       defaultEndTimeCondition = "3000-01-01";
     }
     if (!!dongCode) {
@@ -74,25 +86,40 @@ router.get("/getSearchedEVChargingLog", async (req, res, next) => {
       defaultChargerLocCondition = "";
     }
 
+    let sRow = (pageNo - 1) * numOfRows;
+    let size = numOfRows * 1;
+
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, 
                         charger_loc AS chargerLoc, charger_type AS chargerType, charge_amount AS chargeAmount,
                         DATE_FORMAT(charge_start_dtime, '%Y-%m-%d %h:%i:%s') AS chargeStartDtime,
                         DATE_FORMAT(charge_end_dtime, '%Y-%m-%d %h:%i:%s') AS chargeEndDtime,
                         use_fee AS useFee
                  FROM t_ev_charging_log
-                 WHERE (DATE(charge_start_dtime) >= '${defaultStartTimeCondition} ${starTime}' AND DATE(charge_end_dtime) <= '${defaultEndTimeCondition} ${endTime}') 
+                 WHERE (DATE(charge_start_dtime) >= '${defaultStartTimeCondition} ${startDate}' AND DATE(charge_end_dtime) <= '${defaultEndTimeCondition} ${endDate}') 
                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
-                       AND charger_loc ${defaultChargerLocCondition} ${chargerLocCondition}`;
+                       AND charger_loc ${defaultChargerLocCondition} ${chargerLocCondition}
+                       LIMIT ?,?`;
 
     console.log("sql: " + sql);
-    const data = await pool.query(sql);
+    const data = await pool.query(sql, [Number(sRow), Number(size)]);
     let resultList = data[0];
+
+    const sql2 = `SELECT count(idx) as cnt
+                  FROM t_ev_charging_log
+                  WHERE (DATE(charge_start_dtime) >= '${defaultStartTimeCondition} ${startDate}' AND DATE(charge_end_dtime) <= '${defaultEndTimeCondition} ${endDate}') 
+                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
+                        AND charger_loc ${defaultChargerLocCondition} ${chargerLocCondition}`;
+    const data2 = await pool.query(sql2);
+    let resultCnt = data2[0];
 
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
       data: {
-        resultList,
+        items: resultList,
       },
     };
 

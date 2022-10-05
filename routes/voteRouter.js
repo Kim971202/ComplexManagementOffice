@@ -326,4 +326,25 @@ router.get("/getVoteResult", async (req, res, next) => {
   }
 });
 
+// 세대 투표 참여 여부(오프라인 투표전에 관리팀에서 해당 세대가 월패드 및 모바일로 투표 참여 여부 확인)
+// router.get("/getVoteJoinResult", async (req, res, next) => {
+//   let { idx = 0, dongCode = "", hoCode = "" } = req.query;
+//   console.log(idx, dongCode, hoCode);
+//   try {
+//     const sql = `SELECT a.idx AS idx, a.dong_code AS dongCode, a.ho_code AS hoCode
+//                 FROM t_voters a
+//                 INNER JOIN t_vote_agenda b
+//                 WHERE  a.idx = b.idx AND (a.dong_code = ? AND a.ho_code = ?) and b.idx = ?`;
+//     console.log("sql: " + sql);
+//     const data = await pool.query(sql, [dongCode, hoCode, idx]);
+//     if (data[0][0].idx == null) {
+//       console.log("idx is null");
+//     }
+//     // console.log(data[0][0].idx);
+//     // console.log(data[0][0].dongCode);
+//     // console.log(data[0][0].hoCode);
+//   } catch (error) {
+//     return res.status(500).json(error);
+//   }
+// });
 module.exports = router;

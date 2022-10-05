@@ -12,8 +12,11 @@ let {
 // 택배 정보 조회
 router.get("/getParcelList", async (req, res, next) => {
   let {
-    arrivalTime = "",
-    receiveTime = "",
+    serviceKey = "111111111", // 서비스 인증키
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1, //               페이지 번호
+    startDate = "",
+    endDate = "",
     dongCode = "",
     hoCode = "",
     parcelStatus = "",
@@ -21,13 +24,19 @@ router.get("/getParcelList", async (req, res, next) => {
   } = req.query;
 
   console.log(
-    arrivalTime,
-    receiveTime,
+    serviceKey,
+    numOfRows,
+    pageNo,
+    startDate,
+    endDate,
     dongCode,
     hoCode,
     parcelStatus,
     sendResult
   );
+
+  let sRow = (pageNo - 1) * numOfRows;
+  let size = numOfRows * 1;
 
   let parcelStatus_ = "%";
 
@@ -51,10 +60,10 @@ router.get("/getParcelList", async (req, res, next) => {
     let defaultRDateCondition = "";
 
     // 도착일시 와 수령시간이 없을 경우 Default 날자 값을 넣는다.
-    if (!arrivalTime) {
+    if (!startDate) {
       defaultADateCondition = "1900-01-01";
     }
-    if (!receiveTime) {
+    if (!endDate) {
       defaultRDateCondition = "3000-01-01";
     }
     if (!!dongCode) {
@@ -73,20 +82,37 @@ router.get("/getParcelList", async (req, res, next) => {
       sendResultCondition = `= '${sendResult}'`;
       defaultSendResultCondition = "";
     }
-    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, parcel_flag AS parcelFlag, IFNULL(memo, 'Empty Memo') AS parcelCorp, 
+    const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, dong_code AS dongCode, ho_code AS hoCode, (parcel_flag) AS parcelFlag, IFNULL(memo, '-') AS parcelCorp, 
                         DATE_FORMAT(arrival_time, '%Y-%m-%d %h:%i:%s') AS arrivalTime, DATE_FORMAT(receive_time, '%Y-%m-%d %h:%i:%s') AS receiveTime,
                         send_result AS sendResult
                 FROM t_delivery
-                WHERE (DATE(arrival_time) >= '${defaultADateCondition} ${arrivalTime}' AND DATE(receive_time) <= '${defaultRDateCondition} ${receiveTime}') 
+                WHERE (DATE(arrival_time) >= '${defaultADateCondition} ${startDate}' AND DATE(receive_time) <= '${defaultRDateCondition} ${endDate}') 
                       AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
                       AND parcel_status ${defaultParcelStatusCondition} ${parcelStatusCondition}
-                      AND send_result ${defaultSendResultCondition} ${sendResultCondition};`;
+                      AND send_result ${defaultSendResultCondition} ${sendResultCondition}
+                      LIMIT ?,?`;
 
     console.log("sql: " + sql);
-    const data = await pool.query(sql);
+    const data = await pool.query(sql, [Number(sRow), Number(size)]);
     let resultList = data[0];
+    const sql2 = `SELECT count(idx) as cnt
+                  FROM t_delivery
+                  WHERE (DATE(arrival_time) >= '${defaultADateCondition} ${startDate}' AND DATE(receive_time) <= '${defaultRDateCondition} ${endDate}') 
+                        AND (dong_code ${defaultDongCondition} ${dongCondition} AND ho_code ${defaultHoCondition} ${hoCondition}) 
+                        AND parcel_status ${defaultParcelStatusCondition} ${parcelStatusCondition}
+                        AND send_result ${defaultSendResultCondition} ${sendResultCondition};`;
+    const data2 = await pool.query(sql2);
+    let resultCnt = data2[0];
+
     let jsonResult = {
-      resultList,
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
+      data: {
+        items: resultList,
+      },
     };
     return res.json(jsonResult);
   } catch (error) {
@@ -98,14 +124,13 @@ router.get("/getParcelList", async (req, res, next) => {
 // 경비실에서 받아서 직접 등록
 router.post("/postParcel", async (req, res, next) => {
   let {
-    arrivalTime = "",
     parcelStatus = 0,
     dongCode = "",
     hoCode = "",
-    memo = "",
-  } = req.query;
+    parcelCorp = "",
+  } = req.body;
 
-  console.log(arrivalTime, parcelStatus, dongCode, hoCode, memo);
+  console.log(parcelStatus, dongCode, hoCode, parcelCorp);
   try {
     parcelBoxNo = "00" + 1;
     mailBoxNo = "0" + 1;
@@ -114,9 +139,8 @@ router.post("/postParcel", async (req, res, next) => {
     parcelFlage = "유인";
 
     let sql = `INSERT INTO t_delivery(arrival_time, parcel_box_no, mail_box_no, receiver, del_fee, dong_code, ho_code, receive_time, parcel_status, parcel_flag, user_id, send_time, send_result, memo)
-               VALUES(DATE_FORMAT(?,"%y-%m-%d"),?,?,?,?,?,?,now(),?,?,'tester',now(),'Y',?)`;
+               VALUES(now(),?,?,?,?,?,?,now(),?,?,'tester',now(),'N',?)`;
     const data = await pool.query(sql, [
-      arrivalTime,
       parcelBoxNo,
       mailBoxNo,
       receiver,
@@ -125,7 +149,7 @@ router.post("/postParcel", async (req, res, next) => {
       hoCode,
       parcelStatus,
       parcelFlage,
-      memo,
+      parcelCorp,
     ]);
     console.log("data[0]=>" + data[0]);
 
@@ -155,16 +179,16 @@ router.post("/postParcel", async (req, res, next) => {
  * 
  */
 router.put("/updateParcel", async (req, res, next) => {
-  let { idx = 0, parcelStatus = 0 } = req.body;
-  console.log(idx, parcelStatus);
+  let { serviceKey = "", idx = 0, parcelStatus = 0 } = req.body;
+  console.log(serviceKey, idx, parcelStatus);
 
   try {
-    const sql = `UPDATE t_delivery SET parcel_status = ? WHERE idx = ?`;
+    const sql = `UPDATE t_delivery SET parcel_status = ?, receive_time = now() WHERE idx = ?`;
     console.log("sql: " + sql);
     const data = await pool.query(sql, [parcelStatus, idx]);
-    let resultList = data[0];
     let jsonResult = {
-      resultList,
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
     };
     return res.json(jsonResult);
   } catch (error) {
@@ -172,8 +196,9 @@ router.put("/updateParcel", async (req, res, next) => {
   }
 });
 
+// 택배 등록 삭제
 router.delete("/deleteParcel", async (req, res, next) => {
-  let { idx = 0 } = req.body;
+  let { serviceKey = "", idx = 0 } = req.body;
   console.log(idx);
 
   try {
@@ -182,7 +207,8 @@ router.delete("/deleteParcel", async (req, res, next) => {
     const data = await pool.query(sql, [idx]);
     let resultList = data[0];
     let jsonResult = {
-      resultList,
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
     };
     return res.json(jsonResult);
   } catch (error) {
