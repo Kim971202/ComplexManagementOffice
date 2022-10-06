@@ -367,8 +367,8 @@ router.post("/postOffVote", async (req, res, next) => {
 
 // 투표 마감 취소
 router.post("/postCancelOffVote", async (req, res, next) => {
-  let { idx = 0 } = req.body;
-  console.log(idx);
+  let { serviceKey = "", idx = 0 } = req.body;
+  console.log(serviceKey, idx);
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
@@ -376,7 +376,7 @@ router.post("/postCancelOffVote", async (req, res, next) => {
     });
   }
   try {
-    const sql = `UPDATE t_vote_items SET vote_number_off = 0 WHERE idx = ?`;
+    const sql = `UPDATE t_vote_items SET votes_number_off = 0 WHERE idx = ?`;
     console.log("sql: " + sql);
     const data = await pool.query(sql, [idx]);
     let jsonResult = {
@@ -391,8 +391,8 @@ router.post("/postCancelOffVote", async (req, res, next) => {
 
 // 투표 종료 처리
 router.post("/postEndVote", async (req, res, next) => {
-  let { idx = 0 } = req.body;
-  console.log(idx);
+  let { serviceKey = "", idx = 0 } = req.body;
+  console.log(serviceKey, idx);
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
@@ -415,8 +415,8 @@ router.post("/postEndVote", async (req, res, next) => {
 
 // 투표 결과 조회
 router.get("/getVoteResult", async (req, res, next) => {
-  let { idx = 0 } = req.query;
-  console.log(idx);
+  let { serviceKey = "", idx = 0 } = req.query;
+  console.log(serviceKey, idx);
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
