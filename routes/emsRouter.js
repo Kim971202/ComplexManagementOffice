@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
-const checkServiceKeyResult = require("../modules/authentication");
+const { checkServiceKeyResult } = require("../modules/authentication");
 
 // 에너지 조회
 router.get("/getEMS", async (req, res, next) => {

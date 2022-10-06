@@ -1,12 +1,20 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB/dbPool");
-const checkServiceKeyResult = require("../modules/authentication");
+const { checkServiceKeyResult } = require("../modules/authentication");
 
 // 투표 목록 조회
 router.get("/getVoteAgenda", async (req, res, next) => {
-  let { startDate = "", endDate = "", voteEndFlag = "" } = req.query;
-  console.log(startDate, endDate, voteEndFlag);
+  let {
+    serviceKey = "",
+    numOfRows = 10, //           페이지 당 결과수
+    pageNo = 1, //               페이지 번호
+    startDate = "",
+    endDate = "",
+    voteEndFlag = "",
+  } = req.query;
+  console.log(serviceKey, numOfRows, pageNo, startDate, endDate, voteEndFlag);
+
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
@@ -34,17 +42,81 @@ router.get("/getVoteAgenda", async (req, res, next) => {
       voteEndFlagCondition = `= '${voteEndFlag}'`;
       defaultVoteEndFlag = "";
     }
-
+    let sRow = (pageNo - 1) * numOfRows;
+    let size = numOfRows * 1;
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY idx) AS No, DATE_FORMAT(v_start_dtime, '%Y-%m-%d %h:%s') AS vStartDTime, DATE_FORMAT(v_end_dtime, '%Y-%m-%d %h:%s') AS vEndDTime,
                         vote_rate AS voteRate, vote_end_flag AS vEndFlag, user_code AS userCode
                  FROM t_vote_agenda
                  WHERE (DATE(v_start_dtime) >= '${defaultStartDate} ${startDate}' AND DATE(v_start_dtime) <= '${defaultEndDate} ${endDate}') 
-                       AND vote_end_flag ${defaultVoteEndFlag} ${voteEndFlagCondition}`;
+                       AND vote_end_flag ${defaultVoteEndFlag} ${voteEndFlagCondition}
+                       LIMIT ?,?`;
     console.log("sql: " + sql);
-    const data = await pool.query(sql);
+    const data = await pool.query(sql, [Number(sRow), Number(size)]);
     let resultList = data[0];
+
+    const sql2 = `SELECT count(idx) as cnt
+                  FROM t_vote_agenda 
+                  WHERE (DATE(v_start_dtime) >= '${defaultStartDate} ${startDate}' AND DATE(v_start_dtime) <= '${defaultEndDate} ${endDate}') 
+                  AND vote_end_flag ${defaultVoteEndFlag} ${voteEndFlagCondition}`;
+    const data2 = await pool.query(sql2);
+    let resultCnt = data2[0];
+
     let jsonResult = {
-      resultList,
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      numOfRows,
+      pageNo,
+      totalCount: resultCnt[0].cnt + "",
+      data: {
+        items: resultList,
+      },
+    };
+    return res.json(jsonResult);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+
+// 투표 상세 조회
+router.get("/getDetailedVoteAgenda", async (req, res, next) => {
+  let { serviceKey = "", idx = 0 } = req.query;
+  console.log(serviceKey, idx);
+
+  if ((await checkServiceKeyResult(serviceKey)) == false) {
+    return res.json({
+      resultCode: "30",
+      resultMsg: "등록되지 않은 서비스키 입니다.",
+    });
+  }
+  try {
+    const sql = `SELECT a.vote_title AS voteTitle, DATE_FORMAT(a.v_start_dtime, '%Y-%m-%d %h:%s') AS vStartDTime, DATE_FORMAT(a.v_end_dtime, '%Y-%m-%d %h:%s') AS vEndDTime,
+                        b.item_no AS itemNo, b.item_content AS itemContent
+                 FROM t_vote_agenda a
+                 INNER JOIN t_vote_items b
+                 WHERE a.idx = b.idx AND a.idx = ?`;
+    console.log("sql: " + sql);
+    const data = await pool.query(sql, [idx]);
+    let resultList = data[0];
+
+    let voteTitle = resultList[0].voteTitle;
+    let vStartDTime = resultList[0].vStartDTime;
+    let vEndDTime = resultList[0].vEndDTime;
+
+    let voteItems = [];
+    for (var i = 0; i < resultList.length; i++) {
+      voteItems.push({
+        itemNo: resultList[i].itemNo,
+        itemContent: resultList[i].itemContent,
+      });
+    }
+
+    let jsonResult = {
+      resultCode: "00",
+      resultMsg: "NORMAL_SERVICE",
+      voteTitle,
+      vStartDTime,
+      vEndDTime,
+      data: voteItems,
     };
     return res.json(jsonResult);
   } catch (error) {
@@ -55,14 +127,22 @@ router.get("/getVoteAgenda", async (req, res, next) => {
 // 투표 등록
 router.post("/postVoteAgenda", async (req, res, next) => {
   let {
+    serviceKey = "",
     voteTitle = "",
-    voteDesc = "",
+    voteContent = "",
     vStartDTime = "",
     vEndDTime = "",
     itemContents = [],
     dongCode = "",
   } = req.body;
-  console.log(voteTitle, voteDesc, vStartDTime, vEndDTime, itemContents);
+  console.log(
+    serviceKey,
+    voteTitle,
+    voteContent,
+    vStartDTime,
+    vEndDTime,
+    itemContents
+  );
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
@@ -75,7 +155,7 @@ router.post("/postVoteAgenda", async (req, res, next) => {
 
     // 투표대상세대수 찾는 구문
     let countSQL = `SELECT ho_code AS hoCode, (SELECT COUNT(ho_code) AS hCount FROM t_dongho WHERE dong_code = ?) AS hCount 
-    FROM t_dongho WHERE dong_code = ?`;
+                    FROM t_dongho WHERE dong_code = ?`;
     console.log("countSQL: " + countSQL);
     const countData = await pool.query(countSQL, [dongCode, dongCode]);
     console.log(countData[0]);
@@ -87,10 +167,10 @@ router.post("/postVoteAgenda", async (req, res, next) => {
     console.log("sql: " + sql);
     const data = await pool.query(sql, [
       voteTitle,
-      voteDesc,
+      voteContent,
       insertStartTime,
       insertEndTime,
-      countData[0][0].hCount - 1,
+      countData[0][0].hCount,
     ]);
 
     let getIdxSQL = `SELECT idx as idx FROM t_vote_agenda ORDER BY idx DESC LIMIT 1`;
@@ -121,6 +201,7 @@ router.post("/postVoteAgenda", async (req, res, next) => {
 // 투표 수정: 단, 이미 시작된 투표는 수정 불가능
 router.put("/updateVoteAgenda", async (req, res, next) => {
   let {
+    serviceKey = "",
     idx = 0,
     voteTitle = "",
     voteDesc = "",
@@ -130,6 +211,7 @@ router.put("/updateVoteAgenda", async (req, res, next) => {
     itemNo = [],
   } = req.body;
   console.log(
+    serviceKey,
     idx,
     voteTitle,
     voteDesc,
@@ -215,14 +297,16 @@ router.put("/updateVoteAgenda", async (req, res, next) => {
 
 // 투표 삭제: 단, 이미 시작된 투표는 삭제 불가능
 router.delete("/deleteVoteAgenda", async (req, res, next) => {
-  let { idx = 0 } = req.body;
-  console.log(idx);
+  let { serviceKey = "", idx = 0 } = req.body;
+  console.log(serviceKey, idx);
+
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
       resultMsg: "등록되지 않은 서비스키 입니다.",
     });
   }
+
   try {
     const sql = `SELECT DATE_FORMAT(v_start_dtime, '%Y-%m-%d %h') AS vsDtime FROM t_vote_agenda WHERE idx = ?`;
     console.log("sql: " + sql);
@@ -257,8 +341,8 @@ router.delete("/deleteVoteAgenda", async (req, res, next) => {
 
 // 오프라인 득표수 추가(투표 마감하기)
 router.post("/postOffVote", async (req, res, next) => {
-  let { idx = 0, itemNo = [], voteNumberOff = 0 } = req.body;
-  console.log(idx, itemNo, voteNumberOff);
+  let { serviceKey = "", idx = 0, itemNo = [], voteNumberOff = [] } = req.body;
+  console.log(serviceKey, idx, itemNo, voteNumberOff);
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
@@ -266,10 +350,10 @@ router.post("/postOffVote", async (req, res, next) => {
     });
   }
   try {
-    const sql = `UPDATE t_vote_items SET vote_number_off = ? WHERE idx = ? AND item_no = ?`;
+    const sql = `UPDATE t_vote_items SET votes_number_off = ? WHERE idx = ? AND item_no = ?`;
     console.log("sql: " + sql);
     for (i = 0; i < itemNo.length; ++i) {
-      const data = await pool.query(sql, [voteNumberOff, idx, itemNo[i]]);
+      const data = await pool.query(sql, [voteNumberOff[i], idx, itemNo[i]]);
     }
     let jsonResult = {
       resultCode: "00",

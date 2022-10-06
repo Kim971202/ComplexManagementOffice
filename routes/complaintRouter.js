@@ -163,7 +163,7 @@ router.get("/getDetailedApplicationList", async (req, res, next) => {
     2: 접수
     3: 처리
  * */
-router.put("/updateComplaint", async (req, res, next) => {
+router.put("/updateApplication", async (req, res, next) => {
   let { idx = 0, progressStatus = 0, memo = "" } = req.body;
   console.log(idx, progressStatus, memo);
 
@@ -198,7 +198,7 @@ router.put("/updateComplaint", async (req, res, next) => {
   }
 });
 
-router.delete("/deleteComplaint", async (req, res, next) => {
+router.delete("/deleteApplication", async (req, res, next) => {
   let { serviceKey = "", idx = 0 } = req.body;
   console.log(serviceKey, idx);
 
