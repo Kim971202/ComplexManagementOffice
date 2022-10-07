@@ -73,8 +73,9 @@ router.get("/getDetailedEMS", async (req, res, next) => {
     endDate = "",
     dongCode = "",
     hoCode = "",
+    energyType = "",
   } = req.query;
-  console.log(serviceKey, startDate, endDate, dongCode, hoCode);
+  console.log(serviceKey, startDate, endDate, dongCode, hoCode, energyType);
   if ((await checkServiceKeyResult(serviceKey)) == false) {
     return res.json({
       resultCode: "30",
@@ -82,11 +83,34 @@ router.get("/getDetailedEMS", async (req, res, next) => {
     });
   }
   try {
+    let elecSQL = `CONCAT('meter: ', elec_meter, ' usage: ', elec_usage) AS elec`;
+    let waterSQL = `CONCAT('meter: ', water_meter,' usage: ', water_usage) AS water`;
+    let hotWaterSQL = `CONCAT('meter: ', hot_water_meter, ' usage: ', hot_water_usage) AS hotWater`;
+    let heatingSQL = `CONCAT('meter: ', heating_meter, ' usage: ', heating_usage) AS heating`;
+    let condition = "";
+    if (energyType == "elec") {
+      waterSQL = "";
+      hotWaterSQL = "";
+      heatingSQL = "";
+    } else if (energyType == "water") {
+      elecSQL = "";
+      hotWaterSQL = "";
+      heatingSQL = "";
+    } else if (energyType == "hotWater") {
+      waterSQL = "";
+      elecSQL = "";
+      heatingSQL = "";
+    } else if (energyType == "heating") {
+      waterSQL = "";
+      hotWaterSQL = "";
+      elecSQL = "";
+    } else {
+      condition = `,`;
+      console.log("energyType : ALL");
+    }
+
     const sql = `SELECT ROW_NUMBER() OVER(ORDER BY energy_dtime) AS No,  DATE_FORMAT(energy_dtime, '%Y-%m-%d') AS date,
-                            CONCAT('meter: ', elec_meter, ' usage: ', elec_usage) AS elec,
-                            CONCAT('meter: ', water_meter,' usage: ', water_usage) AS water,
-                            CONCAT('meter: ', hot_water_meter, ' usage: ', hot_water_usage) AS hotWater,
-                            CONCAT('meter: ', heating_meter, ' usage: ', heating_usage) AS heating
+                            ${elecSQL} ${condition} ${waterSQL} ${condition} ${hotWaterSQL} ${condition} ${heatingSQL}
                      FROM t_energy
                      WHERE (DATE(energy_dtime) >= ? AND DATE(energy_dtime) <= ?)
                             AND (dong_code = ? AND ho_code = ?)`;

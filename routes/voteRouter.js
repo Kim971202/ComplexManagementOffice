@@ -424,7 +424,17 @@ router.get("/getVoteResult", async (req, res, next) => {
     });
   }
   try {
-    const sql = `SELECT a.idx, a.vote_title AS voteTitle, vote_desc AS voteDesc,
+    const voterSQL = `SELECT CONCAT(b.dong_code, ' - ', b.ho_code, ': ' , b.vote_method) AS voters
+                      FROM t_vote_agenda a 
+                      INNER JOIN t_voters b
+                      WHERE a.idx = b.idx AND a.idx = ?;`;
+    console.log("voterSQL: " + voterSQL);
+    const vData = await pool.query(voterSQL, [idx]);
+    let voters = [];
+    for (i = 0; i < vData[0].length; ++i) {
+      voters[i] = vData[0][i].voters;
+    }
+    const sql = `SELECT a.vote_title AS voteTitle, vote_desc AS voteDesc,
                         DATE_FORMAT(a.v_start_dtime, '%Y%m%d%h%i%s') AS vStartDate, 
                         DATE_FORMAT(a.v_end_dtime, '%Y%m%d%h%i%s') AS vEndDate, 
                         a.vote_end_flag AS voteResult, a.subjects_num AS subjectsNum,
@@ -438,12 +448,38 @@ router.get("/getVoteResult", async (req, res, next) => {
     console.log("sql: " + sql);
     const data = await pool.query(sql, [idx]);
     let resultList = data[0];
+
+    resultList = data[0];
+    if (resultList.length > 0) {
+      voteTitle = resultList[0].voteTitle;
+      voteDesc = resultList[0].voteDesc;
+      vStartDate = resultList[0].vStartDate;
+      vEndDate = resultList[0].vEndDate;
+      subjectsNum = resultList[0].subjectsNum;
+      participationNum = resultList[0].participationNum;
+      voteRate = resultList[0].voteRate;
+    }
+    let voteItems = [];
+    for (var i = 0; i < resultList.length; i++) {
+      voteItems.push({
+        itemNo: resultList[i].itemNo,
+        itemContent: resultList[i].itemContent,
+        votesNumber: resultList[i].votesNumber,
+        getVotesRate: resultList[i].getVotesRate,
+      });
+    }
     let jsonResult = {
       resultCode: "00",
       resultMsg: "NORMAL_SERVICE",
-      data: {
-        resultList,
-      },
+      voters,
+      voteTitle,
+      voteDesc,
+      vStartDate,
+      vEndDate,
+      subjectsNum,
+      participationNum,
+      voteRate,
+      voteItems,
     };
     return res.json(jsonResult);
   } catch (error) {
